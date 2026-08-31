@@ -25,6 +25,7 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     skateBackwards = false;
     hasSpinned = false;
     animWait = 0;
+
 }
 
 GrindRail::~GrindRail() { }
@@ -69,7 +70,7 @@ void GrindRail::control() {
         mRailRider->moveToNearestPos(nearestPos);
 
         delta = nearestPos - playerPos;
-        if (delta.length() < snapRadius && !MR::isPlayerJumpRising() ) {
+        if (delta.length() < snapRadius && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0) {
             OSReport("Snap to rail\n");
             setNerve(&NrvGrindRail::NrvSnapPlayerToRail::sInstance);
         }
@@ -106,17 +107,20 @@ void GrindRail::exeSnapPlayerToRail() {
 void GrindRail::exePlayerOnRail() {
 
     bool jumpedFromEdge = false;
-    
-
+   
     if(!MR::isPlayerJumpRising() || jumpedFromEdge) {
         MR::becomePlayerNormalJumpStatus();
         MR::setPlayerStateWait();
     }
 
-    if (MR::isPlayerDamaging()){
+    if (MR::isPlayerDamaging() && MR::getPlayerLife() > 0 && !MR::isPlayerParalyzing()){
         MR::resetPlayerStatus();
         MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
         MR::becomeContinuousBckPlayer();
+    }
+
+    if (MR::getPlayerLife() <= 0 || MR::isPlayerParalyzing()) {
+        setNerve(&NrvGrindRail::NrvWait::sInstance);
     }
 
     if((hasSpinned && animWait <= 0) || MR::isFirstStep(this)) {
@@ -136,7 +140,10 @@ void GrindRail::exePlayerOnRail() {
     if(animWait < 0) {
         animWait = 0;
     }
-
+    damageDelay--;
+    if(damageDelay < 0) {
+        damageDelay = 0;
+    }
     
     
     f32 targetSpeed = 0.0f;
