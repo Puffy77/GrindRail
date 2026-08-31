@@ -19,6 +19,7 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     momentumInfluence = 1.0f;
 
     
+    currentSpeed = 0.0f;
     nearestPos.set(0.0f, 0.0f, 0.0f);
     skateBackwards = false;
     hasSpinned = false;
@@ -33,6 +34,8 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::processInitFunction(this, rIter, false);
     MR::onCalcGravity(this);
     MR::connectToSceneMapObjStrongLight(this);
+
+    MR::hideModel(this);
 
     MR::getJMapInfoArg0NoInit(rIter, &snapRadius);
     MR::getJMapInfoArg1NoInit(rIter, &momentumInfluence);
@@ -94,6 +97,7 @@ void GrindRail::exeSnapPlayerToRail() {
     MR::setPlayerPos(nearestPos);
     setNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance);
     skateBackwards = false;
+    MR::getCurrentRailPointArg0NoInit(this, &currentSpeed);
 }
 
 
@@ -122,14 +126,30 @@ void GrindRail::exePlayerOnRail() {
         MR::setPlayerStateWait();
     }
     
-    s32 railPoint = MR::getCurrentRailPointNo(this);
-    //OSReport("Rail Point: %d\n", railPoint);
-    f32 speed = 0.0f;
-    MR::getCurrentRailPointArg0NoInit(this, &speed);
+    f32 targetSpeed = 0.0f;
+    MR::getCurrentRailPointArg0NoInit(this, &targetSpeed);
+    f32 accel = 0.0f;
+    MR::getCurrentRailPointArg1NoInit(this, &accel);
+    accel /= 1000.0f;
+
+    if (currentSpeed < targetSpeed) {
+        currentSpeed += accel;
+        if (currentSpeed > targetSpeed) {
+            currentSpeed = targetSpeed;
+        }
+    }
+    else if (currentSpeed > targetSpeed) {
+        currentSpeed -= accel;
+        if (currentSpeed < targetSpeed) {
+            currentSpeed = targetSpeed;
+        }
+    }
+    
+    
     //OSReport("Rail Speed: %f\n", speed);
 
 
-    mRailRider->setSpeed(speed);
+    mRailRider->setSpeed(currentSpeed);
     mRailRider->move();
     MR::moveTransToCurrentRailPos(this);
     MR::setPlayerPos(mTranslation);
@@ -142,7 +162,7 @@ void GrindRail::exePlayerOnRail() {
     if(MR::isPlayerJumpRising()) {
         MR::startBckPlayer("IceJump", static_cast< const char* >(nullptr));
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
-        TVec3f jumpVec = getJumpVec(speed);
+        TVec3f jumpVec = getJumpVec(currentSpeed);
         MR::setPlayerJumpVec(jumpVec);
     }
 

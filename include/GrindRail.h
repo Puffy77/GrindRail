@@ -21,8 +21,10 @@ public:
     f32 snapRadius;
     f32 momentumInfluence;
 
+    f32 currentSpeed;
     TVec3f nearestPos;
     bool skateBackwards;
     bool hasSpinned;
     s32 animWait;
+    
 };
