@@ -15,6 +15,8 @@ public:
     void exeWait();
     void exeJumpingOff();
 
+    bool receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver);
+
     f32 snapRadius;
     TVec3f nearestPos;
     MarioActor* player;

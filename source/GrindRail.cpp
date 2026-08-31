@@ -20,6 +20,7 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     snapRadius = 100.0f;
     nearestPos.set(0.0f, 0.0f, 0.0f);
     MarioActor* player = MarioAccess::getPlayerActor();
+    
 }
 
 GrindRail::~GrindRail() { }
@@ -33,6 +34,9 @@ void GrindRail::init(const JMapInfoIter &rIter) {
 
     initRailRider(rIter);
     pt::initRailToNearestAndRepositionWithGravity(this);
+
+    initHitSensor(1);
+    MR::addHitSensorMapObj(this, "SpinDetector", 1, 100.0f, TVec3f(0.0f, 0.0f, 0.0f));
 
     initNerve(&NrvGrindRail::NrvWait::sInstance, 0);
     makeActorAppeared();
@@ -63,6 +67,14 @@ void GrindRail::control() {
 
 void GrindRail::exeWait(){}
 
+bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver) {
+    if (MR::isMsgPlayerSpinAttack(msg) && isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance)) {
+        MR::startBckPlayerJ("SkateL");
+        return true;
+    }
+    return false;
+}
+
 void GrindRail::exeSnapPlayerToRail() {
     MR::setPlayerPos(nearestPos);
     setNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance);
@@ -72,7 +84,7 @@ void GrindRail::exeSnapPlayerToRail() {
 void GrindRail::exePlayerOnRail() {
     if (MR::isFirstStep(this) || MR::isPlayerHipDropFalling() || MR::isPlayerSquat()) {
         OSReport("Player on rail\n");
-        MR::startBckPlayerJ("SkateL");
+        MR::startBckPlayerJ("SkateR");
         MR::becomeContinuousBckPlayer();
         
     }
