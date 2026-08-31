@@ -36,6 +36,7 @@ void GrindRail::init(const JMapInfoIter &rIter) {
 
     MR::getJMapInfoArg0NoInit(rIter, &snapRadius);
     MR::getJMapInfoArg1NoInit(rIter, &momentumInfluence);
+    momentumInfluence = momentumInfluence / 1000.0f;
 
     initRailRider(rIter);
     pt::initRailToNearestAndRepositionWithGravity(this);
@@ -97,8 +98,8 @@ void GrindRail::exeSnapPlayerToRail() {
 
 
 void GrindRail::exePlayerOnRail() {
-    if (MR::isFirstStep(this) || MR::isPlayerHipDropFalling() || MR::isPlayerSquat() || (hasSpinned && animWait <= 0)) {
-        OSReport("Player on rail\n");
+
+    if(animWait <= 0) {
         if(skateBackwards) {
             MR::startBckPlayer("SkateBackR", static_cast< const char* >(nullptr));
             hasSpinned = false;
@@ -108,7 +109,7 @@ void GrindRail::exePlayerOnRail() {
             MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
             hasSpinned = false;
         }
-        
+        MR::becomeContinuousBckPlayer();
     }
 
     animWait--;
