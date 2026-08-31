@@ -135,7 +135,7 @@ void GrindRail::exePlayerOnRail() {
     MR::setPlayerPos(mTranslation);
 
     TVec3f railDirection;
-    MR::calcNearestRailDirection(&railDirection, this, mTranslation);
+    railDirection = MR::getRailDirection(this);
     MR::setPlayerFrontVec(railDirection, 1);
     
 
@@ -158,7 +158,7 @@ void GrindRail::exeJumpingOff() {
 TVec3f GrindRail::getJumpVec(f32 currentSpeed){
 
     TVec3f railDirection;
-    MR::calcNearestRailDirection(&railDirection, this, mTranslation);
+    railDirection = MR::getRailDirection(this);
     OSReport("Rail Direction: %f, %f, %f\n", railDirection.x, railDirection.y, railDirection.z);
 
     TVec3f jumpVec = -mGravity;
