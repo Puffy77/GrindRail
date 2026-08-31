@@ -115,7 +115,8 @@ void GrindRail::exePlayerOnRail() {
 
     if (MR::isPlayerDamaging()){
         MR::resetPlayerStatus();
-        MR::changePlayerAnimAndStartBvaIfExist("SkateR");
+        MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
+        MR::becomeContinuousBckPlayer();
     }
 
     if((hasSpinned && animWait <= 0) || MR::isFirstStep(this)) {
