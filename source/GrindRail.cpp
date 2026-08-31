@@ -50,7 +50,7 @@ void GrindRail::control() {
 
     if (isNerve(&NrvGrindRail::NrvWait::sInstance)){
         mTranslation = nearestPos;
-        
+        mRailRider->moveToNearestPos(nearestPos);
 
         delta = nearestPos - playerPos;
         if (delta.length() < snapRadius && !MR::isPlayerJumpRising() ) {
@@ -68,15 +68,19 @@ void GrindRail::exeSnapPlayerToRail() {
     setNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance);
 }
 
+
 void GrindRail::exePlayerOnRail() {
     if (MR::isFirstStep(this) || MR::isPlayerHipDropFalling() || MR::isPlayerSquat()) {
         OSReport("Player on rail\n");
         MR::startBckPlayerJ("SkateL");
+        MR::becomeContinuousBckPlayer();
+        
+    }
+
+    if(!MR::isPlayerJumpRising()){
         MR::becomePlayerNormalJumpStatus();
         MR::setPlayerStateWait();
     }
-
-    
     
     s32 railPoint = MR::getCurrentRailPointNo(this);
     //OSReport("Rail Point: %d\n", railPoint);
