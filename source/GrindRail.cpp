@@ -17,6 +17,7 @@ namespace NrvGrindRail {
 GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     snapRadius = 100.0f;
     momentumInfluence = 1.0f;
+    jumpAtEdge = 1;
 
     
     currentSpeed = 0.0f;
@@ -39,6 +40,7 @@ void GrindRail::init(const JMapInfoIter &rIter) {
 
     MR::getJMapInfoArg0NoInit(rIter, &snapRadius);
     MR::getJMapInfoArg1NoInit(rIter, &momentumInfluence);
+    MR::getJMapInfoArg2NoInit(rIter, &jumpAtEdge);
     momentumInfluence = momentumInfluence / 1000.0f;
 
     initRailRider(rIter);
@@ -79,9 +81,9 @@ void GrindRail::exeWait(){}
 
 bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver) {
     if (MR::isMsgPlayerSpinAttack(msg) && isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance)) {
-        MR::startBckPlayer("IceSkateSpin", static_cast< const char* >(nullptr));
-        animWait = 49;
+        MR::changePlayerAnimAndStartBvaIfExist("IceSkateSpin");
         hasSpinned = true;
+        animWait = 49;
         if(skateBackwards) {
            skateBackwards = false;
         }
@@ -103,9 +105,22 @@ void GrindRail::exeSnapPlayerToRail() {
 
 void GrindRail::exePlayerOnRail() {
 
-    if(animWait <= 0) {
+    bool jumpedFromEdge = false;
+    
+
+    if(!MR::isPlayerJumpRising() || jumpedFromEdge) {
+        MR::becomePlayerNormalJumpStatus();
+        MR::setPlayerStateWait();
+    }
+
+    if (MR::isPlayerDamaging()){
+        MR::resetPlayerStatus();
+        MR::changePlayerAnimAndStartBvaIfExist("SkateR");
+    }
+
+    if((hasSpinned && animWait <= 0) || MR::isFirstStep(this)) {
         if(skateBackwards) {
-            MR::startBckPlayer("SkateBackR", static_cast< const char* >(nullptr));
+            MR::startBckPlayer("SkateL", static_cast< const char* >(nullptr));
             hasSpinned = false;
             
         }
@@ -121,10 +136,7 @@ void GrindRail::exePlayerOnRail() {
         animWait = 0;
     }
 
-    if(!MR::isPlayerJumpRising()){
-        MR::becomePlayerNormalJumpStatus();
-        MR::setPlayerStateWait();
-    }
+    
     
     f32 targetSpeed = 0.0f;
     MR::getCurrentRailPointArg0NoInit(this, &targetSpeed);
@@ -159,10 +171,23 @@ void GrindRail::exePlayerOnRail() {
     MR::setPlayerFrontVec(railDirection, 1);
     
 
-    if(MR::isPlayerJumpRising()) {
-        MR::startBckPlayer("IceJump", static_cast< const char* >(nullptr));
+    if(mRailRider->isReachedGoal() || mRailRider->isReachedEdge()){
+        TVec3f endVec = getJumpVec(currentSpeed, jumpAtEdge);
+        MR::forceJumpPlayer(endVec);
+        jumpedFromEdge = true;
+        if (jumpAtEdge == 1) {
+            MR::changePlayerAnimAndStartBvaIfExist("IceJump");
+        }
+        else {
+            MR::changePlayerAnimAndStartBvaIfExist("Fall");
+        }
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
-        TVec3f jumpVec = getJumpVec(currentSpeed);
+    }
+
+    if(MR::isPlayerJumpRising() && !jumpedFromEdge) {
+        MR::changePlayerAnimAndStartBvaIfExist("IceJump");
+        setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
+        TVec3f jumpVec = getJumpVec(currentSpeed, 1);
         MR::setPlayerJumpVec(jumpVec);
     }
 
@@ -175,7 +200,7 @@ void GrindRail::exeJumpingOff() {
     }
 }
 
-TVec3f GrindRail::getJumpVec(f32 currentSpeed){
+TVec3f GrindRail::getJumpVec(f32 currentSpeed, s32 includeJump){
 
     TVec3f railDirection;
     railDirection = MR::getRailDirection(this);
@@ -190,7 +215,14 @@ TVec3f GrindRail::getJumpVec(f32 currentSpeed){
 
     orthogonalVec.scale(currentSpeed * momentumInfluence);
     jumpVec.scale(25.0f);
-    TVec3f finalVec = jumpVec + orthogonalVec;
+    TVec3f finalVec;
+
+    if(includeJump == 1) {
+        finalVec = orthogonalVec + jumpVec;
+    }
+    else {
+        finalVec = orthogonalVec;
+    }
     
 
     OSReport("Perpendicular Vector: %f, %f, %f\n", orthogonalVec.x, orthogonalVec.y, orthogonalVec.z);
