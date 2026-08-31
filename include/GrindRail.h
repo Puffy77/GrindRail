@@ -16,9 +16,13 @@ public:
     void exeJumpingOff();
 
     bool receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver);
-    TVec3f getJumpVec();
+    TVec3f getJumpVec(f32 currentSpeed);
 
     f32 snapRadius;
+    f32 momentumInfluence;
+
     TVec3f nearestPos;
     bool skateBackwards;
+    bool hasSpinned;
+    s32 animWait;
 };

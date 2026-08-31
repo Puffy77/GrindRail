@@ -1,4 +1,5 @@
 #include "GrindRail.h"
+#include "Game/Player/MarioAccess.h"
 
 
 namespace pt {
@@ -15,9 +16,13 @@ namespace NrvGrindRail {
 
 GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     snapRadius = 100.0f;
-    nearestPos.set(0.0f, 0.0f, 0.0f);
-    bool skateBackwards = false;
+    momentumInfluence = 1.0f;
+
     
+    nearestPos.set(0.0f, 0.0f, 0.0f);
+    skateBackwards = false;
+    hasSpinned = false;
+    animWait = 0;
 }
 
 GrindRail::~GrindRail() { }
@@ -29,11 +34,14 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::onCalcGravity(this);
     MR::connectToSceneMapObjStrongLight(this);
 
+    MR::getJMapInfoArg0NoInit(rIter, &snapRadius);
+    MR::getJMapInfoArg1NoInit(rIter, &momentumInfluence);
+
     initRailRider(rIter);
     pt::initRailToNearestAndRepositionWithGravity(this);
 
     initHitSensor(1);
-    MR::addHitSensorMapObj(this, "SpinDetector", 1, 100.0f, TVec3f(0.0f, 0.0f, 0.0f));
+    MR::addHitSensorMapObj(this, "SpinDetector", 1, 500.0f, TVec3f(0.0f, 0.0f, 0.0f));
 
     initNerve(&NrvGrindRail::NrvWait::sInstance, 0);
     makeActorAppeared();
@@ -42,6 +50,7 @@ void GrindRail::init(const JMapInfoIter &rIter) {
 
 
 void GrindRail::control() {
+
 
     TVec3f nearestDirection;
     TVec3f delta;
@@ -66,7 +75,9 @@ void GrindRail::exeWait(){}
 
 bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver) {
     if (MR::isMsgPlayerSpinAttack(msg) && isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance)) {
-        //MR::startBckPlayerJ("IceSkateSpin");
+        MR::startBckPlayer("IceSkateSpin", static_cast< const char* >(nullptr));
+        animWait = 49;
+        hasSpinned = true;
         if(skateBackwards) {
            skateBackwards = false;
         }
@@ -86,17 +97,23 @@ void GrindRail::exeSnapPlayerToRail() {
 
 
 void GrindRail::exePlayerOnRail() {
-    if (MR::isFirstStep(this) || MR::isPlayerHipDropFalling() || MR::isPlayerSquat()) {
+    if (MR::isFirstStep(this) || MR::isPlayerHipDropFalling() || MR::isPlayerSquat() || (hasSpinned && animWait <= 0)) {
         OSReport("Player on rail\n");
         if(skateBackwards) {
-            MR::startBckPlayerJ("SkateBackR");
+            MR::startBckPlayer("SkateBackR", static_cast< const char* >(nullptr));
+            hasSpinned = false;
+            
         }
         else {
-            MR::startBckPlayerJ("SkateR");
+            MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
+            hasSpinned = false;
         }
-         
-        MR::becomeContinuousBckPlayer();
         
+    }
+
+    animWait--;
+    if(animWait < 0) {
+        animWait = 0;
     }
 
     if(!MR::isPlayerJumpRising()){
@@ -116,12 +133,13 @@ void GrindRail::exePlayerOnRail() {
     MR::moveTransToCurrentRailPos(this);
     MR::setPlayerPos(mTranslation);
 
-    TVec3f jumpVec = getJumpVec();
-    MR::setPlayerJumpVec(jumpVec);
+    
 
     if(MR::isPlayerJumpRising()) {
-        MR::startBckPlayerJ("IceJump");
+        MR::startBckPlayer("IceJump", static_cast< const char* >(nullptr));
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
+        TVec3f jumpVec = getJumpVec(speed);
+        MR::setPlayerJumpVec(jumpVec);
     }
 
 
@@ -133,12 +151,25 @@ void GrindRail::exeJumpingOff() {
     }
 }
 
-TVec3f GrindRail::getJumpVec(){
+TVec3f GrindRail::getJumpVec(f32 currentSpeed){
+
     TVec3f railDirection;
     MR::calcNearestRailDirection(&railDirection, this, mTranslation);
-    TVec3f upVec;
-    upVec = -mGravity;
-    TVec3f parallelVec = (railDirection.dot(upVec) / upVec.length()) * upVec;
-    TVec3f perpVec = railDirection - parallelVec;
-    return upVec + perpVec;
+    OSReport("Rail Direction: %f, %f, %f\n", railDirection.x, railDirection.y, railDirection.z);
+
+    TVec3f jumpVec = -mGravity;
+    jumpVec.normalize(jumpVec);
+
+    f32 parallelVec = railDirection.dot(jumpVec);
+    TVec3f orthogonalVec = railDirection - (jumpVec * parallelVec);
+    orthogonalVec.normalize(orthogonalVec);
+
+    orthogonalVec.scale(currentSpeed * momentumInfluence);
+    jumpVec.scale(25.0f);
+    TVec3f finalVec = jumpVec + orthogonalVec;
+    
+
+    OSReport("Perpendicular Vector: %f, %f, %f\n", orthogonalVec.x, orthogonalVec.y, orthogonalVec.z);
+    OSReport("Final Jump Vector: %f, %f, %f\n", finalVec.x, finalVec.y, finalVec.z);
+    return finalVec;
 }
