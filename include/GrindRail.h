@@ -16,8 +16,9 @@ public:
     void exeJumpingOff();
 
     bool receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver);
+    TVec3f getJumpVec();
 
     f32 snapRadius;
     TVec3f nearestPos;
-    MarioActor* player;
+    bool skateBackwards;
 };

@@ -1,8 +1,5 @@
 #include "GrindRail.h"
-#include "Game/Player/MarioActor.h"
-#include "Game/Player/MarioAccess.h"
-#include "Game/Player/MarioState.h"
-#include "Game/Player/MarioModule.h"
+
 
 namespace pt {
     extern void initRailToNearestAndRepositionWithGravity(LiveActor* pActor);
@@ -19,7 +16,7 @@ namespace NrvGrindRail {
 GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     snapRadius = 100.0f;
     nearestPos.set(0.0f, 0.0f, 0.0f);
-    MarioActor* player = MarioAccess::getPlayerActor();
+    bool skateBackwards = false;
     
 }
 
@@ -69,7 +66,13 @@ void GrindRail::exeWait(){}
 
 bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver) {
     if (MR::isMsgPlayerSpinAttack(msg) && isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance)) {
-        MR::startBckPlayerJ("SkateL");
+        //MR::startBckPlayerJ("IceSkateSpin");
+        if(skateBackwards) {
+           skateBackwards = false;
+        }
+        else {
+           skateBackwards = true;
+        }
         return true;
     }
     return false;
@@ -78,13 +81,20 @@ bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *p
 void GrindRail::exeSnapPlayerToRail() {
     MR::setPlayerPos(nearestPos);
     setNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance);
+    skateBackwards = false;
 }
 
 
 void GrindRail::exePlayerOnRail() {
     if (MR::isFirstStep(this) || MR::isPlayerHipDropFalling() || MR::isPlayerSquat()) {
         OSReport("Player on rail\n");
-        MR::startBckPlayerJ("SkateR");
+        if(skateBackwards) {
+            MR::startBckPlayerJ("SkateBackR");
+        }
+        else {
+            MR::startBckPlayerJ("SkateR");
+        }
+         
         MR::becomeContinuousBckPlayer();
         
     }
@@ -106,7 +116,11 @@ void GrindRail::exePlayerOnRail() {
     MR::moveTransToCurrentRailPos(this);
     MR::setPlayerPos(mTranslation);
 
+    TVec3f jumpVec = getJumpVec();
+    MR::setPlayerJumpVec(jumpVec);
+
     if(MR::isPlayerJumpRising()) {
+        MR::startBckPlayerJ("IceJump");
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
     }
 
@@ -117,4 +131,14 @@ void GrindRail::exeJumpingOff() {
     if (MR::isGreaterEqualStep(this, 30)) {
         setNerve(&NrvGrindRail::NrvWait::sInstance);
     }
+}
+
+TVec3f GrindRail::getJumpVec(){
+    TVec3f railDirection;
+    MR::calcNearestRailDirection(&railDirection, this, mTranslation);
+    TVec3f upVec;
+    upVec = -mGravity;
+    TVec3f parallelVec = (railDirection.dot(upVec) / upVec.length()) * upVec;
+    TVec3f perpVec = railDirection - parallelVec;
+    return upVec + perpVec;
 }
