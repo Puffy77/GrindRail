@@ -69,12 +69,14 @@ void GrindRail::exeSnapPlayerToRail() {
 }
 
 void GrindRail::exePlayerOnRail() {
-    if (MR::isFirstStep(this)) {
+    if (MR::isFirstStep(this) || MR::isPlayerHipDropFalling() || MR::isPlayerSquat()) {
         OSReport("Player on rail\n");
-        MR::startBckPlayerJ("TubeSlide");
+        MR::startBckPlayerJ("SkateL");
+        MR::becomePlayerNormalJumpStatus();
+        MR::setPlayerStateWait();
     }
 
-    MR::becomePlayerNormalJumpStatus();
+    
     
     s32 railPoint = MR::getCurrentRailPointNo(this);
     //OSReport("Rail Point: %d\n", railPoint);
