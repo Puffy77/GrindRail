@@ -1,0 +1,20 @@
+{
+  "Name": "GrindRail",
+  "Author": "Puffy",
+  "Description": "Grind Rails",
+  "InstallDependencies": ["Syati_ObjectFactories", "Syati_Init"],
+  "SupportedGames": [
+    "SB4"
+  ],
+  "ModuleData" : [
+    {
+      "NameObjFactory" : [
+        {
+          "Name" : "GrindRail",
+          "Function" : "createExtActor<GrindRail>",
+          "Include" : "GrindRail.h"
+        }
+      ]
+    }
+  ]
+}
