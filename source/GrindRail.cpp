@@ -134,6 +134,9 @@ void GrindRail::exePlayerOnRail() {
     MR::moveTransToCurrentRailPos(this);
     MR::setPlayerPos(mTranslation);
 
+    TVec3f railDirection;
+    MR::calcNearestRailDirection(&railDirection, this, mTranslation);
+    MR::setPlayerFrontVec(railDirection, 1);
     
 
     if(MR::isPlayerJumpRising()) {
