@@ -72,7 +72,7 @@ void GrindRail::control() {
         mRailRider->moveToNearestPos(nearestPos);
 
         delta = nearestPos - playerPos;
-        if (delta.length() < snapRadius && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0 && ((MR::isValidSwitchA(this) && MR::isOnSwitchA(this))) || !MR::isValidSwitchA(this)) {
+        if (delta.length() < snapRadius && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0 && ((MR::isValidSwitchA(this) && MR::isOnSwitchA(this)) || !MR::isValidSwitchA(this))) {
             OSReport("Snap to rail\n");
             setNerve(&NrvGrindRail::NrvSnapPlayerToRail::sInstance);
         }
