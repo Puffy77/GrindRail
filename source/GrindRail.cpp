@@ -44,6 +44,8 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::getJMapInfoArg2NoInit(rIter, &jumpAtEdge);
     momentumInfluence = momentumInfluence / 1000.0f;
 
+    MR::useStageSwitchReadA(this, rIter);
+
     initRailRider(rIter);
     pt::initRailToNearestAndRepositionWithGravity(this);
 
@@ -70,7 +72,7 @@ void GrindRail::control() {
         mRailRider->moveToNearestPos(nearestPos);
 
         delta = nearestPos - playerPos;
-        if (delta.length() < snapRadius && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0) {
+        if (delta.length() < snapRadius && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0 && ((MR::isValidSwitchA(this) && MR::isOnSwitchA(this))) || !MR::isValidSwitchA(this)) {
             OSReport("Snap to rail\n");
             setNerve(&NrvGrindRail::NrvSnapPlayerToRail::sInstance);
         }
@@ -136,14 +138,21 @@ void GrindRail::exePlayerOnRail() {
         MR::becomeContinuousBckPlayer();
     }
 
+    if (MR::getPlayerCurrentBckName() != "SkateR" && MR::getPlayerCurrentBckName() != "SkateL" && !MR::getPlayerCurrentBckName() != "IceSkateSpin") {
+        if(skateBackwards) {
+            MR::startBckPlayer("SkateL", static_cast< const char* >(nullptr));
+        }
+        else {
+            MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
+        }
+        MR::becomeContinuousBckPlayer();
+    }
+
     animWait--;
     if(animWait < 0) {
         animWait = 0;
     }
-    damageDelay--;
-    if(damageDelay < 0) {
-        damageDelay = 0;
-    }
+
     
     
     f32 targetSpeed = 0.0f;
