@@ -42,9 +42,6 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::getJMapInfoArg0NoInit(rIter, &snapRadius);
     MR::getJMapInfoArg1NoInit(rIter, &momentumInfluence);
     MR::getJMapInfoArg2NoInit(rIter, &jumpAtEdge);
-
-    MR::useStageSwitchReadA(this, rIter);
-
     momentumInfluence = momentumInfluence / 1000.0f;
 
     initRailRider(rIter);
@@ -73,7 +70,7 @@ void GrindRail::control() {
         mRailRider->moveToNearestPos(nearestPos);
 
         delta = nearestPos - playerPos;
-        if (delta.length() < snapRadius && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0 && ((MR::isValidSwitchA(this) && MR::isOnSwitchA(this)) || !MR::isValidSwitchA(this))) {
+        if (delta.length() < snapRadius && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0) {
             OSReport("Snap to rail\n");
             setNerve(&NrvGrindRail::NrvSnapPlayerToRail::sInstance);
         }
@@ -85,7 +82,9 @@ void GrindRail::exeWait(){}
 
 bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver) {
     if (MR::isMsgPlayerSpinAttack(msg) && isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance)) {
+        MR::changePlayerAnimAndStartBvaIfExist("IceSkateSpin");
         hasSpinned = true;
+        animWait = 49;
         if(skateBackwards) {
            skateBackwards = false;
         }
@@ -124,15 +123,26 @@ void GrindRail::exePlayerOnRail() {
         setNerve(&NrvGrindRail::NrvWait::sInstance);
     }
 
-
-    if(MR::getPlayerCurrentBckName() != "SkateR" && MR::getPlayerCurrentBckName() != "SkateL") {
+    if((hasSpinned && animWait <= 0) || MR::isFirstStep(this)) {
         if(skateBackwards) {
             MR::startBckPlayer("SkateL", static_cast< const char* >(nullptr));
+            hasSpinned = false;
+            
         }
         else {
             MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
+            hasSpinned = false;
         }
         MR::becomeContinuousBckPlayer();
+    }
+
+    animWait--;
+    if(animWait < 0) {
+        animWait = 0;
+    }
+    damageDelay--;
+    if(damageDelay < 0) {
+        damageDelay = 0;
     }
     
     
@@ -193,7 +203,7 @@ void GrindRail::exePlayerOnRail() {
 }
 
 void GrindRail::exeJumpingOff() {
-    if (MR::isGreaterEqualStep(this, 60)) {
+    if (MR::isGreaterEqualStep(this, 30)) {
         setNerve(&NrvGrindRail::NrvWait::sInstance);
     }
 }
