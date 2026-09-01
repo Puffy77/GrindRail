@@ -25,6 +25,7 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     skateBackwards = false;
     hasSpinned = false;
     animWait = 0;
+    damageResetDelay = 0;
 
 }
 
@@ -84,7 +85,6 @@ void GrindRail::exeWait(){}
 
 bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver) {
     if (MR::isMsgPlayerSpinAttack(msg) && isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance)) {
-        MR::changePlayerAnimAndStartBvaIfExist("IceSkateSpin");
         hasSpinned = true;
         animWait = 49;
         if(skateBackwards) {
@@ -109,36 +109,41 @@ void GrindRail::exeSnapPlayerToRail() {
 void GrindRail::exePlayerOnRail() {
 
     bool jumpedFromEdge = false;
-   
+
+    const char *currentBckName = MR::getPlayerCurrentBckName();
+    bool isSkateR = strcmp(currentBckName, "SkateR") == 0;
+    bool isSkateL = strcmp(currentBckName, "SkateL") == 0;
+    bool isSpinBck = strcmp(currentBckName, "SpinGround") == 0;
+
     if(!MR::isPlayerJumpRising() || jumpedFromEdge) {
         MR::becomePlayerNormalJumpStatus();
         MR::setPlayerStateWait();
     }
 
-    if (MR::isPlayerDamaging() && MR::getPlayerLife() > 0 && !MR::isPlayerParalyzing()){
-        MR::resetPlayerStatus();
-        MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
-        MR::becomeContinuousBckPlayer();
+    if (MR::isPlayerDamaging() && MR::getPlayerLife() > 0 && !MR::isPlayerParalyzing()) {
+        if (damageResetDelay <= 0) {
+            damageResetDelay = 5;
+        }
+    }
+    else {
+        damageResetDelay = 0;
+    }
+
+    if (damageResetDelay > 0) {
+        damageResetDelay--;
+        if (damageResetDelay == 0) {
+            MR::resetPlayerStatus();
+            MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
+            MR::becomeContinuousBckPlayer();
+        }
     }
 
     if (MR::getPlayerLife() <= 0 || MR::isPlayerParalyzing()) {
         setNerve(&NrvGrindRail::NrvWait::sInstance);
+        damageResetDelay = 0;
     }
 
-    if((hasSpinned && animWait <= 0) || MR::isFirstStep(this)) {
-        if(skateBackwards) {
-            MR::startBckPlayer("SkateL", static_cast< const char* >(nullptr));
-            hasSpinned = false;
-            
-        }
-        else {
-            MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
-            hasSpinned = false;
-        }
-        MR::becomeContinuousBckPlayer();
-    }
-
-    if (MR::getPlayerCurrentBckName() != "SkateR" && MR::getPlayerCurrentBckName() != "SkateL" && MR::getPlayerCurrentBckName() != "IceSkateSpin") {
+    if ((!isSpinBck && !isSkateR && !isSkateL) || ((hasSpinned && animWait <= 0) || MR::isFirstStep(this))) {
         if(skateBackwards) {
             MR::startBckPlayer("SkateL", static_cast< const char* >(nullptr));
         }
@@ -146,8 +151,12 @@ void GrindRail::exePlayerOnRail() {
             MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
         }
         MR::becomeContinuousBckPlayer();
+        if (hasSpinned) {
+            hasSpinned = false;
+        }
     }
 
+    OSReport("Current Animation: %s\n", currentBckName);
     animWait--;
     if(animWait < 0) {
         animWait = 0;

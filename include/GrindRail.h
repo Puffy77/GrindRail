@@ -27,5 +27,6 @@ public:
     bool skateBackwards;
     bool hasSpinned;
     s32 animWait;
+    s32 damageResetDelay;
     
 };
