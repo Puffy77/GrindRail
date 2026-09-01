@@ -138,7 +138,7 @@ void GrindRail::exePlayerOnRail() {
         MR::becomeContinuousBckPlayer();
     }
 
-    if (MR::getPlayerCurrentBckName() != "SkateR" && MR::getPlayerCurrentBckName() != "SkateL" && !MR::getPlayerCurrentBckName() != "IceSkateSpin") {
+    if (MR::getPlayerCurrentBckName() != "SkateR" && MR::getPlayerCurrentBckName() != "SkateL" && MR::getPlayerCurrentBckName() != "IceSkateSpin") {
         if(skateBackwards) {
             MR::startBckPlayer("SkateL", static_cast< const char* >(nullptr));
         }
