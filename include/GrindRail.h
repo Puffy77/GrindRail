@@ -18,15 +18,16 @@ public:
     bool receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver);
     TVec3f getJumpVec(f32 currentSpeed, s32 includeJump);
 
-    f32 snapRadius;
-    f32 momentumInfluence;
-    s32 jumpAtEdge;
+    f32 mSnapRadius;
+    f32 mJumpDirectionInfluence;
+    f32 mMomentumInfluence;
+    s32 mJumpAtEdge;
 
-    f32 currentSpeed;
-    TVec3f nearestPos;
-    bool skateBackwards;
-    bool hasSpinned;
-    s32 animWait;
-    s32 damageResetDelay;
+    f32 mCurrentSpeed;
+    TVec3f mNearestPos;
+    bool mSkateBackwards;
+    bool mHasSpinned;
+    s32 mAnimWait;
+    s32 mDamageResetDelay;
     
 };

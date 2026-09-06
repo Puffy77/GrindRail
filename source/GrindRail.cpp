@@ -1,5 +1,4 @@
 #include "GrindRail.h"
-#include "Game/Player/MarioAccess.h"
 
 
 namespace pt {
@@ -15,17 +14,18 @@ namespace NrvGrindRail {
 }
 
 GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
-    snapRadius = 100.0f;
-    momentumInfluence = 1.0f;
-    jumpAtEdge = 1;
+    mSnapRadius = 100.0f;
+    mJumpDirectionInfluence = 10.0f;
+    mMomentumInfluence = 1.0f;
+    mJumpAtEdge = 1;
 
     
-    currentSpeed = 0.0f;
-    nearestPos.set(0.0f, 0.0f, 0.0f);
-    skateBackwards = false;
-    hasSpinned = false;
-    animWait = 0;
-    damageResetDelay = 0;
+    mCurrentSpeed = 0.0f;
+    mNearestPos.set(0.0f, 0.0f, 0.0f);
+    mSkateBackwards = false;
+    mHasSpinned = false;
+    mAnimWait = 0;
+    mDamageResetDelay = 0;
 
 }
 
@@ -37,13 +37,17 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::processInitFunction(this, rIter, false);
     MR::onCalcGravity(this);
     MR::connectToSceneMapObjStrongLight(this);
+    MR::joinToGroupArray(this, rIter, "RailGroup", 32);
 
     MR::hideModel(this);
 
-    MR::getJMapInfoArg0NoInit(rIter, &snapRadius);
-    MR::getJMapInfoArg1NoInit(rIter, &momentumInfluence);
-    MR::getJMapInfoArg2NoInit(rIter, &jumpAtEdge);
-    momentumInfluence = momentumInfluence / 1000.0f;
+    MR::getJMapInfoArg0NoInit(rIter, &mSnapRadius);
+    MR::getJMapInfoArg1NoInit(rIter, &mJumpDirectionInfluence);
+    MR::getJMapInfoArg2NoInit(rIter, &mMomentumInfluence);
+    MR::getJMapInfoArg3NoInit(rIter, &mJumpAtEdge);
+    mJumpDirectionInfluence = mJumpDirectionInfluence / 1000.0f;
+    mMomentumInfluence = mMomentumInfluence / 1000.0f;
+    
 
     MR::useStageSwitchReadA(this, rIter);
 
@@ -66,14 +70,14 @@ void GrindRail::control() {
     TVec3f delta;
     TVec3f playerPos = *MR::getPlayerPos();
 
-    MR::calcNearestRailPosAndDirection(&nearestPos, &nearestDirection, this, playerPos);
+    MR::calcNearestRailPosAndDirection(&mNearestPos, &nearestDirection, this, playerPos);
 
     if (isNerve(&NrvGrindRail::NrvWait::sInstance)){
-        mTranslation = nearestPos;
-        mRailRider->moveToNearestPos(nearestPos);
+        mTranslation = mNearestPos;
+        mRailRider->moveToNearestPos(mNearestPos);
 
-        delta = nearestPos - playerPos;
-        if (delta.length() < snapRadius && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0 && ((MR::isValidSwitchA(this) && MR::isOnSwitchA(this)) || !MR::isValidSwitchA(this))) {
+        delta = mNearestPos - playerPos;
+        if (delta.length() < mSnapRadius && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0 && ((MR::isValidSwitchA(this) && MR::isOnSwitchA(this)) || !MR::isValidSwitchA(this))) {
             OSReport("Snap to rail\n");
             setNerve(&NrvGrindRail::NrvSnapPlayerToRail::sInstance);
         }
@@ -85,13 +89,13 @@ void GrindRail::exeWait(){}
 
 bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver) {
     if (MR::isMsgPlayerSpinAttack(msg) && isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance)) {
-        hasSpinned = true;
-        animWait = 49;
-        if(skateBackwards) {
-           skateBackwards = false;
+        mHasSpinned = true;
+        mAnimWait = 49;
+        if(mSkateBackwards) {
+           mSkateBackwards = false;
         }
         else {
-           skateBackwards = true;
+           mSkateBackwards = true;
         }
         return true;
     }
@@ -99,10 +103,10 @@ bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *p
 }
 
 void GrindRail::exeSnapPlayerToRail() {
-    MR::setPlayerPos(nearestPos);
+    MR::setPlayerPos(mNearestPos);
     setNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance);
-    skateBackwards = false;
-    MR::getCurrentRailPointArg0NoInit(this, &currentSpeed);
+    mSkateBackwards = false;
+    MR::getCurrentRailPointArg0NoInit(this, &mCurrentSpeed);
 }
 
 
@@ -121,17 +125,17 @@ void GrindRail::exePlayerOnRail() {
     }
 
     if (MR::isPlayerDamaging() && MR::getPlayerLife() > 0 && !MR::isPlayerParalyzing()) {
-        if (damageResetDelay <= 0) {
-            damageResetDelay = 5;
+        if (mDamageResetDelay <= 0) {
+            mDamageResetDelay = 5;
         }
     }
     else {
-        damageResetDelay = 0;
+        mDamageResetDelay = 0;
     }
 
-    if (damageResetDelay > 0) {
-        damageResetDelay--;
-        if (damageResetDelay == 0) {
+    if (mDamageResetDelay > 0) {
+        mDamageResetDelay--;
+        if (mDamageResetDelay == 0) {
             MR::resetPlayerStatus();
             MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
             MR::becomeContinuousBckPlayer();
@@ -140,26 +144,26 @@ void GrindRail::exePlayerOnRail() {
 
     if (MR::getPlayerLife() <= 0 || MR::isPlayerParalyzing()) {
         setNerve(&NrvGrindRail::NrvWait::sInstance);
-        damageResetDelay = 0;
+        mDamageResetDelay = 0;
     }
 
-    if ((!isSpinBck && !isSkateR && !isSkateL) || ((hasSpinned && animWait <= 0) || MR::isFirstStep(this))) {
-        if(skateBackwards) {
+    if ((!isSpinBck && !isSkateR && !isSkateL) || ((mHasSpinned && mAnimWait <= 0) || MR::isFirstStep(this))) {
+        if(mSkateBackwards) {
             MR::startBckPlayer("SkateL", static_cast< const char* >(nullptr));
         }
         else {
             MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
         }
         MR::becomeContinuousBckPlayer();
-        if (hasSpinned) {
-            hasSpinned = false;
+        if (mHasSpinned) {
+            mHasSpinned = false;
         }
     }
 
     OSReport("Current Animation: %s\n", currentBckName);
-    animWait--;
-    if(animWait < 0) {
-        animWait = 0;
+    mAnimWait--;
+    if(mAnimWait < 0) {
+        mAnimWait = 0;
     }
 
     
@@ -170,16 +174,16 @@ void GrindRail::exePlayerOnRail() {
     MR::getCurrentRailPointArg1NoInit(this, &accel);
     accel /= 1000.0f;
 
-    if (currentSpeed < targetSpeed) {
-        currentSpeed += accel;
-        if (currentSpeed > targetSpeed) {
-            currentSpeed = targetSpeed;
+    if (mCurrentSpeed < targetSpeed) {
+        mCurrentSpeed += accel;
+        if (mCurrentSpeed > targetSpeed) {
+            mCurrentSpeed = targetSpeed;
         }
     }
-    else if (currentSpeed > targetSpeed) {
-        currentSpeed -= accel;
-        if (currentSpeed < targetSpeed) {
-            currentSpeed = targetSpeed;
+    else if (mCurrentSpeed > targetSpeed) {
+        mCurrentSpeed -= accel;
+        if (mCurrentSpeed < targetSpeed) {
+            mCurrentSpeed = targetSpeed;
         }
     }
     
@@ -187,7 +191,7 @@ void GrindRail::exePlayerOnRail() {
     //OSReport("Rail Speed: %f\n", speed);
 
 
-    mRailRider->setSpeed(currentSpeed);
+    mRailRider->setSpeed(mCurrentSpeed);
     mRailRider->move();
     MR::moveTransToCurrentRailPos(this);
     MR::setPlayerPos(mTranslation);
@@ -198,10 +202,10 @@ void GrindRail::exePlayerOnRail() {
     
 
     if(mRailRider->isReachedGoal() || mRailRider->isReachedEdge()){
-        TVec3f endVec = getJumpVec(currentSpeed, jumpAtEdge);
+        TVec3f endVec = getJumpVec(mCurrentSpeed, mJumpAtEdge);
         MR::forceJumpPlayer(endVec);
         jumpedFromEdge = true;
-        if (jumpAtEdge == 1) {
+        if (mJumpAtEdge == 1) {
             MR::changePlayerAnimAndStartBvaIfExist("IceJump");
         }
         else {
@@ -213,7 +217,7 @@ void GrindRail::exePlayerOnRail() {
     if(MR::isPlayerJumpRising() && !jumpedFromEdge) {
         MR::changePlayerAnimAndStartBvaIfExist("IceJump");
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
-        TVec3f jumpVec = getJumpVec(currentSpeed, 1);
+        TVec3f jumpVec = getJumpVec(mCurrentSpeed, 3);
         MR::setPlayerJumpVec(jumpVec);
     }
 
@@ -235,23 +239,36 @@ TVec3f GrindRail::getJumpVec(f32 currentSpeed, s32 includeJump){
     TVec3f jumpVec = -mGravity;
     jumpVec.normalize(jumpVec);
 
-    f32 parallelVec = railDirection.dot(jumpVec);
-    TVec3f orthogonalVec = railDirection - (jumpVec * parallelVec);
-    orthogonalVec.normalize(orthogonalVec);
-
-    orthogonalVec.scale(currentSpeed * momentumInfluence);
-    jumpVec.scale(25.0f);
-    TVec3f finalVec;
-
-    if(includeJump == 1) {
-        finalVec = orthogonalVec + jumpVec;
-    }
-    else {
-        finalVec = orthogonalVec;
-    }
+    // Left-Right momentum
+    TVec3f orthogonalLRVec;
+    PSVECCrossProduct(railDirection, jumpVec, orthogonalLRVec);
+    orthogonalLRVec.normalize(orthogonalLRVec);
+    f32 playerStickX = MR::getPlayerStickX();
+    OSReport("Player Stick X: %f\n", playerStickX);
+    orthogonalLRVec.scale(playerStickX * mJumpDirectionInfluence);
     
 
-    OSReport("Perpendicular Vector: %f, %f, %f\n", orthogonalVec.x, orthogonalVec.y, orthogonalVec.z);
+    // Jump momentum
+    f32 parallelJumpVec = railDirection.dot(jumpVec);
+    TVec3f orthogonalJumpVec = railDirection - (jumpVec * parallelJumpVec);
+    orthogonalJumpVec.normalize(orthogonalJumpVec);
+
+    orthogonalJumpVec.scale(currentSpeed * mMomentumInfluence);
+    jumpVec.scale(25.0f);
+
+
+    TVec3f finalVec;
+    finalVec = orthogonalJumpVec;
+
+    if(includeJump & 1) {
+        finalVec += jumpVec;
+    }
+    
+    if(includeJump & (1 << 1)){
+        finalVec += orthogonalLRVec;
+    }
+
+    OSReport("Perpendicular Vector: %f, %f, %f\n", orthogonalJumpVec.x, orthogonalJumpVec.y, orthogonalJumpVec.z);
     OSReport("Final Jump Vector: %f, %f, %f\n", finalVec.x, finalVec.y, finalVec.z);
     return finalVec;
 }
