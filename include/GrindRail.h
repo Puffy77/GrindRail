@@ -9,15 +9,16 @@ public:
 
     virtual void init(const JMapInfoIter &rIter);
     virtual void control();
+    virtual bool receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver);
+    virtual bool receiveOtherMsg(u32 msg, HitSensor* pSender, HitSensor* pReceiver);
 
     void exeSnapPlayerToRail();
     void exePlayerOnRail();
     void exeWait();
     void exeJumpingOff();
 
-    bool receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver);
     TVec3f getJumpVec(f32 currentSpeed, s32 includeJump);
-    void setPlayerFacingFull();
+    void updatePlayerMtx();
 
     f32 mSnapRadius;
     f32 mJumpDirectionInfluence;
