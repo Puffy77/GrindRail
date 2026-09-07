@@ -1,9 +1,7 @@
 #include "GrindRail.h"
 
-
 namespace pt {
     extern void initRailToNearestAndRepositionWithGravity(LiveActor* pActor);
-    extern void turnToDirectionUpFront(LiveActor *pActor, TVec3f rUp, TVec3f rFront);
 }
 
 namespace NrvGrindRail {
@@ -22,7 +20,6 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     
     mCurrentSpeed = 0.0f;
     mNearestPos.set(0.0f, 0.0f, 0.0f);
-    mSkateBackwards = false;
     mHasSpinned = false;
     mAnimWait = 0;
     mDamageResetDelay = 0;
@@ -37,7 +34,6 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::processInitFunction(this, rIter, false);
     MR::onCalcGravity(this);
     MR::connectToSceneMapObjStrongLight(this);
-    MR::joinToGroupArray(this, rIter, "RailGroup", 32);
 
     MR::hideModel(this);
 
@@ -63,8 +59,9 @@ void GrindRail::init(const JMapInfoIter &rIter) {
 }
 
 
-void GrindRail::control() {
+void GrindRail::control() {}
 
+void GrindRail::exeWait(){
 
     TVec3f nearestDirection;
     TVec3f delta;
@@ -72,31 +69,22 @@ void GrindRail::control() {
 
     MR::calcNearestRailPosAndDirection(&mNearestPos, &nearestDirection, this, playerPos);
 
-    if (isNerve(&NrvGrindRail::NrvWait::sInstance)){
-        mTranslation = mNearestPos;
-        mRailRider->moveToNearestPos(mNearestPos);
+    mTranslation = mNearestPos;
+    mRailRider->moveToNearestPos(mNearestPos);
 
-        delta = mNearestPos - playerPos;
-        if (delta.length() < mSnapRadius && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0 && ((MR::isValidSwitchA(this) && MR::isOnSwitchA(this)) || !MR::isValidSwitchA(this))) {
-            OSReport("Snap to rail\n");
-            setNerve(&NrvGrindRail::NrvSnapPlayerToRail::sInstance);
-        }
+    delta = mNearestPos - playerPos;
+    if (delta.length() < mSnapRadius && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0 && ((MR::isValidSwitchA(this) && MR::isOnSwitchA(this)) || !MR::isValidSwitchA(this))) {
+
+        setNerve(&NrvGrindRail::NrvSnapPlayerToRail::sInstance);
+
     }
 
 }
 
-void GrindRail::exeWait(){}
-
 bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver) {
     if (MR::isMsgPlayerSpinAttack(msg) && isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance)) {
         mHasSpinned = true;
-        mAnimWait = 49;
-        if(mSkateBackwards) {
-           mSkateBackwards = false;
-        }
-        else {
-           mSkateBackwards = true;
-        }
+        mAnimWait = 34;
         return true;
     }
     return false;
@@ -105,7 +93,6 @@ bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *p
 void GrindRail::exeSnapPlayerToRail() {
     MR::setPlayerPos(mNearestPos);
     setNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance);
-    mSkateBackwards = false;
     MR::getCurrentRailPointArg0NoInit(this, &mCurrentSpeed);
 }
 
@@ -115,8 +102,6 @@ void GrindRail::exePlayerOnRail() {
     bool jumpedFromEdge = false;
 
     const char *currentBckName = MR::getPlayerCurrentBckName();
-    bool isSkateR = strcmp(currentBckName, "SkateR") == 0;
-    bool isSkateL = strcmp(currentBckName, "SkateL") == 0;
     bool isSpinBck = strcmp(currentBckName, "SpinGround") == 0;
 
     if(!MR::isPlayerJumpRising() || jumpedFromEdge) {
@@ -125,42 +110,45 @@ void GrindRail::exePlayerOnRail() {
     }
 
     if (MR::isPlayerDamaging() && MR::getPlayerLife() > 0 && !MR::isPlayerParalyzing()) {
+
         if (mDamageResetDelay <= 0) {
             mDamageResetDelay = 5;
         }
+
     }
     else {
+
         mDamageResetDelay = 0;
+
     }
 
     if (mDamageResetDelay > 0) {
+
         mDamageResetDelay--;
         if (mDamageResetDelay == 0) {
+
             MR::resetPlayerStatus();
-            MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
+            MR::startBckPlayer("SlidingRopeWait", static_cast< const char* >(nullptr));
             MR::becomeContinuousBckPlayer();
+
         }
     }
 
     if (MR::getPlayerLife() <= 0 || MR::isPlayerParalyzing()) {
         setNerve(&NrvGrindRail::NrvWait::sInstance);
-        mDamageResetDelay = 0;
     }
 
-    if ((!isSpinBck && !isSkateR && !isSkateL) || ((mHasSpinned && mAnimWait <= 0) || MR::isFirstStep(this))) {
-        if(mSkateBackwards) {
-            MR::startBckPlayer("SkateL", static_cast< const char* >(nullptr));
-        }
-        else {
-            MR::startBckPlayer("SkateR", static_cast< const char* >(nullptr));
-        }
+    if (!isSpinBck || ((mHasSpinned && mAnimWait <= 0) || MR::isFirstStep(this))) {
+        
+        MR::startBckPlayer("SlidingRopeWait", static_cast< const char* >(nullptr));
+        
         MR::becomeContinuousBckPlayer();
         if (mHasSpinned) {
             mHasSpinned = false;
         }
+
     }
 
-    OSReport("Current Animation: %s\n", currentBckName);
     mAnimWait--;
     if(mAnimWait < 0) {
         mAnimWait = 0;
@@ -186,9 +174,6 @@ void GrindRail::exePlayerOnRail() {
             mCurrentSpeed = targetSpeed;
         }
     }
-    
-    
-    //OSReport("Rail Speed: %f\n", speed);
 
 
     mRailRider->setSpeed(mCurrentSpeed);
@@ -196,31 +181,29 @@ void GrindRail::exePlayerOnRail() {
     MR::moveTransToCurrentRailPos(this);
     MR::setPlayerPos(mTranslation);
 
-    TVec3f railDirection;
-    railDirection = MR::getRailDirection(this);
-    MR::setPlayerFrontVec(railDirection, 1);
-    
+    TVec3f railDir = MR::getRailDirection(this);
+    railDir.normalize(railDir);
+    MR::setPlayerFrontVec(railDir,1);
+
+    if (MR::isPlayerJumpRising() && !jumpedFromEdge) {
+        MR::changePlayerAnimAndStartBvaIfExist("JumpBack");
+        setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
+        MR::setPlayerJumpVec(getJumpVec(mCurrentSpeed, 3));
+        return;
+    }
 
     if(mRailRider->isReachedGoal() || mRailRider->isReachedEdge()){
         TVec3f endVec = getJumpVec(mCurrentSpeed, mJumpAtEdge);
         MR::forceJumpPlayer(endVec);
         jumpedFromEdge = true;
-        if (mJumpAtEdge == 1) {
-            MR::changePlayerAnimAndStartBvaIfExist("IceJump");
+        if (mJumpAtEdge & 1) {
+            MR::changePlayerAnimAndStartBvaIfExist("GrowPlantJump");
         }
         else {
             MR::changePlayerAnimAndStartBvaIfExist("Fall");
         }
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
     }
-
-    if(MR::isPlayerJumpRising() && !jumpedFromEdge) {
-        MR::changePlayerAnimAndStartBvaIfExist("IceJump");
-        setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
-        TVec3f jumpVec = getJumpVec(mCurrentSpeed, 3);
-        MR::setPlayerJumpVec(jumpVec);
-    }
-
 
 }
 
@@ -271,4 +254,5 @@ TVec3f GrindRail::getJumpVec(f32 currentSpeed, s32 includeJump){
     OSReport("Perpendicular Vector: %f, %f, %f\n", orthogonalJumpVec.x, orthogonalJumpVec.y, orthogonalJumpVec.z);
     OSReport("Final Jump Vector: %f, %f, %f\n", finalVec.x, finalVec.y, finalVec.z);
     return finalVec;
+
 }
