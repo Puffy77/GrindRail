@@ -13,6 +13,18 @@ namespace NrvGrindRail {
     FULL_NERVE(NrvJumpingOff, GrindRail, JumpingOff);
 }
 
+/*
+Obj_Arg 0: Snapping Radius
+Obj_Arg 1: Jump Behavior at Goal
+
+Point_Arg 0: Speed
+Point_Arg 1: Acceleration
+Point_Arg 2: Jump Momentum Influence
+Point_Arg 3: Jump Momentum Type (Orthogonal or Full)
+Point_Arg 4: Left-Right Jumping (0: None 1: Set 2: Analog)
+Point_Arg 5: Left-Right Jumping Influence
+Point_Arg 6: Allow Jumping
+*/
 GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mSnapRadius = 100000.0f;
     mJumpDirectionInfluence = 10.0f;
@@ -25,7 +37,8 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mHasSpinned = false;
     mAnimWait = 0;
     mDamageResetDelay = 0;
-
+    mLastUpVec.set(0.0f, 0.0f, 0.0f);
+    mLastSideVec.set(0.0f, 0.0f, 0.0f);
 }
 
 GrindRail::~GrindRail() { }
@@ -246,11 +259,18 @@ TVec3f GrindRail::getJumpVec(f32 currentSpeed, s32 includeJump){
     
 
     // Jump momentum
-    f32 parallelJumpVec = railDirection.dot(jumpVec);
-    TVec3f orthogonalJumpVec = railDirection - (jumpVec * parallelJumpVec);
-    orthogonalJumpVec.normalize(orthogonalJumpVec);
+    TVec3f orthogonalJumpVec;
+    if (railDirection.dot(jumpVec) >= 0.999f || railDirection.dot(jumpVec) <= -0.999f) {
+        orthogonalJumpVec = TVec3f(0.0, 0.0, 0.0);
+    }
+    else{
+        f32 parallelJumpVec = railDirection.dot(jumpVec);
+        orthogonalJumpVec = railDirection - (jumpVec * parallelJumpVec);
+        orthogonalJumpVec.normalize(orthogonalJumpVec);
 
-    orthogonalJumpVec.scale(currentSpeed * mMomentumInfluence);
+        orthogonalJumpVec.scale(currentSpeed * mMomentumInfluence);
+    }
+
     jumpVec.scale(25.0f);
 
 
@@ -277,15 +297,55 @@ void GrindRail::updatePlayerMtx(){
     mRailRider->move();
     MR::moveTransToCurrentRailPos(this);
 
-
+  
     TVec3f railDir = MR::getRailDirection(this);
     railDir.normalize(railDir);
-
     TVec3f sideVec;
-    PSVECCrossProduct(-mGravity, railDir, sideVec);
-
     TVec3f upVec;
-    PSVECCrossProduct(railDir, sideVec, upVec);
+    
+
+    if (railDir.dot(-mGravity) >= 0.999f || railDir.dot(-mGravity) <= -0.999f) {
+
+        if(mLastSideVec.length() <= 0.001f || mLastUpVec.length() <= 0.001f){
+
+            TVec3f helperVec;
+            if(abs(mGravity.x) <= abs(mGravity.y) && abs(mGravity.x) <= abs(mGravity.z)){
+                helperVec = TVec3f(1, 0, 0);
+            } 
+            else if(abs(mGravity.y) <= abs(mGravity.z) && abs(mGravity.y) <= abs(mGravity.x)){
+                helperVec = TVec3f(0, 1, 0);
+            }
+            else if (abs(mGravity.z) <= abs(mGravity.x) && abs(mGravity.z) <= abs(mGravity.y)){
+                helperVec = TVec3f(0, 0, 1);
+            }
+            
+            PSVECCrossProduct(-mGravity, helperVec, sideVec);
+            sideVec.normalize(sideVec);
+            mLastSideVec = sideVec;
+
+            PSVECCrossProduct(-mGravity, sideVec, upVec);
+            upVec.normalize(upVec);
+            mLastUpVec = upVec;
+
+        }
+        else{
+
+            sideVec = mLastSideVec;
+            upVec = mLastUpVec;
+
+        }
+    }
+    else{
+
+        PSVECCrossProduct(-mGravity, railDir, sideVec);
+        sideVec.normalize(sideVec);
+        mLastSideVec = sideVec;
+
+        
+        PSVECCrossProduct(railDir, sideVec, upVec);
+        upVec.normalize(upVec);
+        mLastUpVec = upVec;
+    }
 
     TPos3f baseMtx(getBaseMtx());
     TPos3f playerMtx;
