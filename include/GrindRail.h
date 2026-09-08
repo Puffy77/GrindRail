@@ -19,11 +19,19 @@ public:
 
     TVec3f getJumpVec(f32 currentSpeed, s32 includeJump);
     void updatePlayerMtx();
+    void getPointArgs();
 
     f32 mSnapRadius;
-    f32 mJumpDirectionInfluence;
-    f32 mMomentumInfluence;
     s32 mJumpAtEdge;
+
+    f32 mPointSpeed;
+    f32 mPointAccel;
+    f32 mMomentumType;
+    f32 mMomentumInfluence;
+    s32 mLRJumpingStrength;
+    s32 mAllowJumping;
+    f32 mJumpStrength;
+    s32 mAllowSpinning;
 
     f32 mCurrentSpeed;
     TVec3f mNearestPos;
@@ -32,5 +40,7 @@ public:
     s32 mDamageResetDelay;
     TVec3f mLastUpVec;
     TVec3f mLastSideVec;
-    
+    f32 mActualLRJumpingStrength;
+    s32 mActualMomentumType;
+
 };
