@@ -14,17 +14,17 @@ namespace NrvGrindRail {
 }
 
 /*
-Obj_Arg 0: Snapping Radius
-Obj_Arg 1: Jump Behavior at Goal
+Obj_Arg 0: Snapping Radius (Default: 100.000f)
+Obj_Arg 1: Jump Behavior at Goal (Default: 1)
 
-Point_Arg 0: Speed
-Point_Arg 1: Acceleration
-Point_Arg 2: Jump Momentum Type (Orthogonal or Full)
-Point_Arg 3: Jump Momentum Influence
-Point_Arg 4: Left-Right Jumping Strength
-Point_Arg 5: Allow Jumping
-Point_Arg 6: Jump Strength
-Point_Arg 7: Allow Spinning
+Point_Arg 0: Speed (Default: 20.0f)
+Point_Arg 1: Acceleration (Default: 1.000f)
+Point_Arg 2: Jump Momentum Type (Orthogonal or Full) (Default: 0)
+Point_Arg 3: Jump Momentum Influence (Default: 1.000f)
+Point_Arg 4: Left-Right Jumping Strength (Default: 5.000f)
+Point_Arg 5: Allow Jumping (Default: 1)
+Point_Arg 6: Jump Strength (Default: 25.000f)
+Point_Arg 7: Allow Spinning (Default: 1)
 */
 GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mSnapRadius = 100000.0f;
@@ -46,8 +46,6 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mDamageResetDelay = 0;
     mLastUpVec.set(0.0f, 0.0f, 0.0f);
     mLastSideVec.set(0.0f, 0.0f, 0.0f);
-    mActualLRJumpingStrength = 5000.0f;
-    mActualMomentumType = 0;
 }
 
 GrindRail::~GrindRail() { }
@@ -55,16 +53,12 @@ GrindRail::~GrindRail() { }
 void GrindRail::init(const JMapInfoIter &rIter) {
     OSReport("Init\n");
 
-    MR::processInitFunction(this, rIter, false);
     MR::onCalcGravity(this);
-    MR::connectToSceneRide(this);
-
-    //MR::hideModel(this);
+    MR::connectToScene(this, 0x28, -1, -1, -1);
 
     MR::getJMapInfoArg0NoInit(rIter, &mSnapRadius);
     MR::getJMapInfoArg1NoInit(rIter, &mJumpAtEdge);
     mSnapRadius /= 1000.0f;
-    
 
     MR::useStageSwitchReadA(this, rIter);
 
@@ -72,7 +66,7 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     pt::initRailToNearestAndRepositionWithGravity(this);
 
     initHitSensor(1);
-    MR::addHitSensorBinder(this, "SpinDetector", 1, mSnapRadius, TVec3f(0.0f, 0.0f, 0.0f));
+    MR::addHitSensorBinder(this, "Snap", 1, mSnapRadius, TVec3f(0.0f, 0.0f, 0.0f));
 
     initNerve(&NrvGrindRail::NrvWait::sInstance, 0);
     makeActorAppeared();
@@ -93,13 +87,18 @@ void GrindRail::exeWait(){
 
 }
 
-bool GrindRail::receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver) {
-    if (MR::isMsgPlayerSpinAttack(msg) && isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance)) {
-        mHasSpinned = true;
-        mAnimWait = 34;
-        return true;
+
+bool GrindRail::receiveMsgEnemyAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver){
+
+    if(isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance)){
+        setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
+        MR::endBindAndPlayerWait(this);
+        bool out = MR::getPlayerBodySensor()->receiveMessage(msg, pSender);
+        return out;
     }
+    
     return false;
+
 }
 
 bool GrindRail::receiveOtherMsg(u32 msg, HitSensor* pSender, HitSensor* pReceiver){
@@ -111,6 +110,9 @@ bool GrindRail::receiveOtherMsg(u32 msg, HitSensor* pSender, HitSensor* pReceive
     }
     else if (MR::isMsgUpdateBaseMtx(msg)){
         updatePlayerMtx();
+        if(mHasSpinned){
+            MR::sendMsgPlayerPunch(pReceiver, pSender);
+        }
         return true;
     }
     else if (MR::isMsgRushCancel(msg)){
@@ -133,17 +135,21 @@ void GrindRail::exePlayerOnRail() {
 
     bool jumpedFromEdge = false;
 
-    const char *currentBckName = MR::getPlayerCurrentBckName();
-    bool isSpinBck = strcmp(currentBckName, "SpinGround") == 0;
 
     // rip terry
+
+    MR::stopPlayerFpView();
 
     if (MR::isPlayerDamaging() && MR::getPlayerLife() > 0 && !MR::isPlayerParalyzing()) {
 
         if (mDamageResetDelay <= 0) {
             mDamageResetDelay = 5;
         }
-        MR::endBindAndPlayerWait(this);
+        TVec3f damageDir = MR::getRailDirection(this);
+        damageDir.scale(-1.0f);
+        damageDir.normalize(damageDir);
+        MR::getRailDirection(this);
+        MR::endBindAndPlayerDamage(this, damageDir);
 
     }
     else {
@@ -172,20 +178,27 @@ void GrindRail::exePlayerOnRail() {
         MR::endBindAndPlayerWait(this);
     }
 
-    if (MR::isFirstStep(this)) {
+    if (MR::isFirstStep(this) || mAnimWait == 26) {
         
         MR::startBckPlayer("SlidingRopeWait", static_cast< const char* >(nullptr));
         MR::becomeContinuousBckPlayer();
     
     }
 
-    
-    mAnimWait--;
-    if(mAnimWait < 0) {
-        mAnimWait = 0;
+    getPointArgs();
+
+    if(MR::isPadSwing(0) && mAllowSpinning == 1 && !mHasSpinned){
+        MR::changePlayerAnimAndStartBvaIfExist("SpinGround");
+
+        mHasSpinned = true;
+        mAnimWait = 60;
     }
 
-    getPointArgs();
+    mAnimWait--;
+    if(mAnimWait <= 0){
+        mHasSpinned = false;
+        mAnimWait = 0;
+    }
 
     if (mCurrentSpeed < mPointSpeed) {
         mCurrentSpeed += mPointAccel;
@@ -235,6 +248,8 @@ void GrindRail::exeJumpingOff() {
     if (MR::isGreaterEqualStep(this, 60)) {
         setNerve(&NrvGrindRail::NrvWait::sInstance);
     }
+    mHasSpinned = false;
+    mAnimWait = 0;
 }
 
 TVec3f GrindRail::getJumpVec(f32 currentSpeed, s32 includeJump){
@@ -261,7 +276,7 @@ TVec3f GrindRail::getJumpVec(f32 currentSpeed, s32 includeJump){
         if(stick.length() < 0.001f){
             orthogonalLRVec.scale(stick.dot(orthogonalLRVec));
             orthogonalLRVec.normalize(orthogonalLRVec);
-            orthogonalLRVec.scale(mActualLRJumpingStrength);
+            orthogonalLRVec.scale(mLRJumpingStrength);
         }
         else{
             orthogonalLRVec = TVec3f(0.0, 0.0, 0.0);
@@ -273,7 +288,7 @@ TVec3f GrindRail::getJumpVec(f32 currentSpeed, s32 includeJump){
     if (railDirection.dot(jumpVec) >= 0.999f || railDirection.dot(jumpVec) <= -0.999f) {
         momentumJumpVec = TVec3f(0.0, 0.0, 0.0);
     }
-    else if (mActualMomentumType == 0){
+    else if (mMomentumType == 0){
         f32 parallelJumpVec = railDirection.dot(jumpVec);
         momentumJumpVec = railDirection - (jumpVec * parallelJumpVec);
         momentumJumpVec.normalize(momentumJumpVec);
@@ -361,7 +376,8 @@ void GrindRail::updatePlayerMtx(){
         mLastUpVec = upVec;
     }
 
-    TPos3f baseMtx(getBaseMtx());
+    TPos3f baseMtx;
+    MR::makeMtxTRS(baseMtx, this);
     TPos3f playerMtx;
     playerMtx.identity();
 
@@ -378,24 +394,34 @@ void GrindRail::updatePlayerMtx(){
 
 void GrindRail::getPointArgs(){
 
+    f32 pointSpeed = 20.0f;
+    f32 pointSpeed = 20.0f;
+    f32 pointAccel = 1000.0f;
+    f32 momentumType = 0.0f;
+    f32 momentumInfluence = 1000.0f;
+    s32 lrJumpingStrength = 5000;
+    s32 allowJumping = 1;
+    f32 jumpStrength = 25000.0f;
+    s32 allowSpinning = 1;
+
     // For some odd reason Arg 2 has to be Float and arg 4 has to be bool when using currentrailpointnoinit so im working around it.
     s32 railPoint = MR::getCurrentRailPointNo(this);
 
-    MR::getCurrentRailPointArg0NoInit(this, &mPointSpeed);
-    MR::getCurrentRailPointArg1NoInit(this, &mPointAccel);
-    MR::getCurrentRailPointArg2NoInit(this, &mMomentumType);
-    MR::getCurrentRailPointArg3NoInit(this, &mMomentumInfluence);
-    MR::getRailPointArg4NoInit(this, railPoint, &mLRJumpingStrength);
-    MR::getCurrentRailPointArg5NoInit(this, &mAllowJumping);
-    MR::getCurrentRailPointArg6NoInit(this, &mJumpStrength);
-    MR::getCurrentRailPointArg7NoInit(this, &mAllowSpinning);
+    MR::getCurrentRailPointArg0NoInit(this, &pointSpeed);
+    MR::getCurrentRailPointArg1NoInit(this, &pointAccel);
+    MR::getCurrentRailPointArg2NoInit(this, &momentumType);
+    MR::getCurrentRailPointArg3NoInit(this, &momentumInfluence);
+    MR::getRailPointArg4NoInit(this, railPoint, &lrJumpingStrength);
+    MR::getCurrentRailPointArg5NoInit(this, &allowJumping);
+    MR::getCurrentRailPointArg6NoInit(this, &jumpStrength);
+    MR::getCurrentRailPointArg7NoInit(this, &allowSpinning);
 
+    mPointSpeed = pointSpeed;
     OSReport("Point Args: %f, %f, %f, %f, %d, %d, %f, %d\n", mPointSpeed, mPointAccel, mMomentumType, mMomentumInfluence, mLRJumpingStrength, mAllowJumping, mJumpStrength, mAllowSpinning);
     mPointAccel /= 1000.0f;
     mMomentumInfluence /= 1000.0f;
-    mActualLRJumpingStrength = mLRJumpingStrength / 1000.0f;
+    mLRJumpingStrength = lrJumpingStrength / 1000.0f;
     mJumpStrength /= 1000.0f;
-
-    mActualMomentumType = (s32)mMomentumType;
+    mMomentumType = (s32)momentumType;
 
 }

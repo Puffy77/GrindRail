@@ -9,9 +9,9 @@ public:
 
     virtual void init(const JMapInfoIter &rIter);
     virtual void control();
-    virtual bool receiveMsgPlayerAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver);
+    virtual bool receiveMsgEnemyAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver);
     virtual bool receiveOtherMsg(u32 msg, HitSensor* pSender, HitSensor* pReceiver);
-
+    
     void exeSnapPlayerToRail();
     void exePlayerOnRail();
     void exeWait();
@@ -40,7 +40,5 @@ public:
     s32 mDamageResetDelay;
     TVec3f mLastUpVec;
     TVec3f mLastSideVec;
-    f32 mActualLRJumpingStrength;
-    s32 mActualMomentumType;
 
 };
