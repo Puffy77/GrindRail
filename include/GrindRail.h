@@ -23,12 +23,13 @@ public:
 
     f32 mSnapRadius;
     s32 mJumpAtEdge;
-
+    s32 mReattachDelay;
+    
     f32 mPointSpeed;
     f32 mPointAccel;
-    f32 mMomentumType;
+    s32 mMomentumType;
     f32 mMomentumInfluence;
-    s32 mLRJumpingStrength;
+    f32 mLRJumpingStrength;
     s32 mAllowJumping;
     f32 mJumpStrength;
     s32 mAllowSpinning;
