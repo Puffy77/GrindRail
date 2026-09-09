@@ -1,7 +1,5 @@
 #include "GrindRail.h"
 
-// hello chat today we will be porting minecraft into super mario galaxy 3
-// Please liek and soupscribe if you want more sick minecraft porting in super mairo galaxee
 namespace pt {
     extern void initRailToNearestAndRepositionWithGravity(LiveActor* pActor);
 }
@@ -16,6 +14,8 @@ namespace NrvGrindRail {
 /*
 Obj_Arg 0: Snapping Radius (Default: 100.000f)
 Obj_Arg 1: Jump Behavior at Goal (Default: 1)
+Obj_Arg 2: Reattach Delay (Default: 30)
+Obj_Arg 3: SW_B Behavior (While Riding or On Reaching Goal) (Default: 1)
 
 Point_Arg 0: Speed (Default: 20.0f)
 Point_Arg 1: Acceleration (Default: 1.000f)
@@ -26,10 +26,12 @@ Point_Arg 5: Allow Jumping (Default: 1)
 Point_Arg 6: Jump Strength (Default: 25.000f)
 Point_Arg 7: Allow Spinning (Default: 1)
 */
+
 GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mSnapRadius = 100000.0f;
     mJumpAtEdge = 1;
     mReattachDelay = 30;
+    mSWBBehavior = 1;
 
     mPointSpeed = 20.0f;
     mPointAccel = 1000.0f;
@@ -60,6 +62,8 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::getJMapInfoArg0NoInit(rIter, &mSnapRadius);
     MR::getJMapInfoArg1NoInit(rIter, &mJumpAtEdge);
     MR::getJMapInfoArg2NoInit(rIter, &mReattachDelay);
+    MR::getJMapInfoArg3NoInit(rIter, &mSWBBehavior);
+
     if(mSnapRadius <= 0.0f){
         mSnapRadius = 100000.0f;
     }
@@ -69,11 +73,18 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     if(mReattachDelay <= 0){
         mReattachDelay = 30;
     }
+    if(mSWBBehavior < 0 || mSWBBehavior > 1){
+        mSWBBehavior = 1;
+    }
 
     mSnapRadius /= 1000.0f;
 
     MR::useStageSwitchReadA(this, rIter);
     MR::useStageSwitchWriteB(this, rIter);
+    if(MR::isValidSwitchB(this)){
+        MR::offSwitchB(this);
+    }
+        
 
     initRailRider(rIter);
     pt::initRailToNearestAndRepositionWithGravity(this);
@@ -145,6 +156,9 @@ void GrindRail::exePlayerOnRail() {
 
     bool jumpedFromEdge = false;
 
+    if (MR::isValidSwitchB(this) && mSWBBehavior == 0) {
+        MR::onSwitchB(this);
+    }
 
     // rip terry
 
@@ -242,6 +256,10 @@ void GrindRail::exePlayerOnRail() {
         else {
             MR::changePlayerAnimAndStartBvaIfExist("Fall");
         }
+
+        if(MR::isValidSwitchB(this) && mSWBBehavior == 1){
+            MR::onSwitchB(this);
+        }
         
         //OSReport("Edge Jump\n");
         MR::endBindAndPlayerJump(this, getJumpVec(mCurrentSpeed, mJumpAtEdge), 0);
@@ -256,6 +274,11 @@ void GrindRail::exeJumpingOff() {
     if (MR::isGreaterEqualStep(this, mReattachDelay)) {
         setNerve(&NrvGrindRail::NrvWait::sInstance);
     }
+
+    if (MR::isValidSwitchB(this) && mSWBBehavior == 0) {
+        MR::offSwitchB(this);
+    }
+
     mHasSpinned = false;
     mAnimWait = 0;
 }
@@ -423,6 +446,7 @@ void GrindRail::getPointArgs(){
     MR::getCurrentRailPointArg6NoInit(this, &jumpStrength);
     MR::getCurrentRailPointArg7NoInit(this, &allowSpinning);
 
+    
 
     
     mPointSpeed = pointSpeed;
@@ -433,6 +457,31 @@ void GrindRail::getPointArgs(){
     mAllowJumping = allowJumping;
     mJumpStrength = jumpStrength / 1000.0f;
     mAllowSpinning = allowSpinning;
+
+    if(mPointSpeed <= 0.0f) {
+        mPointSpeed = 20.0f;
+    }
+    if(mPointAccel <= 0.0f) {
+        mPointAccel = 1.0f;
+    }
+    if(mMomentumType < 0 || mMomentumType > 1) {
+        mMomentumType = 0;
+    }
+    if(mMomentumInfluence <= 0.0f) {
+        mMomentumInfluence = 1.0f;
+    }
+    if(mLRJumpingStrength < 0.0f) {
+        mLRJumpingStrength = 5000.0f;
+    }
+    if(mAllowJumping < 0 || mAllowJumping > 1) {
+        mAllowJumping = 1;
+    }
+    if(mJumpStrength <= 0.0f) {
+        mJumpStrength = 25000.0f;
+    }
+    if(mAllowSpinning < 0 || mAllowSpinning > 1) {
+        mAllowSpinning = 1;
+    }
 
     OSReport("Point Args: %f, %f, %f, %f, %d, %d, %f, %d\n", mPointSpeed, mPointAccel, mMomentumType, mMomentumInfluence, mLRJumpingStrength, mAllowJumping, mJumpStrength, mAllowSpinning);
     

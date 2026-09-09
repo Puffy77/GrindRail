@@ -24,7 +24,8 @@ public:
     f32 mSnapRadius;
     s32 mJumpAtEdge;
     s32 mReattachDelay;
-    
+    s32 mSWBBehavior;
+
     f32 mPointSpeed;
     f32 mPointAccel;
     s32 mMomentumType;
