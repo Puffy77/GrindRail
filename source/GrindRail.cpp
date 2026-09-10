@@ -16,6 +16,7 @@ Obj_Arg 0: Snapping Radius (Default: 100.000f)
 Obj_Arg 1: Jump Behavior at Goal (Default: 1)
 Obj_Arg 2: Reattach Delay (Default: 30)
 Obj_Arg 3: SW_B Behavior (While Riding or On Reaching Goal) (Default: 1)
+Obj_Arg 4: Collision Behavior (Damage or Death) (Default: 0)
 
 Point_Arg 0: Speed (Default: 20.0f)
 Point_Arg 1: Acceleration (Default: 1.000f)
@@ -32,6 +33,7 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mJumpAtEdge = 1;
     mReattachDelay = 30;
     mSWBBehavior = 1;
+    mCollisionBehavior = 0;
 
     mPointSpeed = 20.0f;
     mPointAccel = 1000.0f;
@@ -49,6 +51,8 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mDamageResetDelay = 0;
     mLastUpVec.set(0.0f, 0.0f, 0.0f);
     mLastSideVec.set(0.0f, 0.0f, 0.0f);
+    mWallBonkDeath = false;
+
 }
 
 GrindRail::~GrindRail() { }
@@ -62,6 +66,7 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::getJMapInfoArg1NoInit(rIter, &mJumpAtEdge);
     MR::getJMapInfoArg2NoInit(rIter, &mReattachDelay);
     MR::getJMapInfoArg3NoInit(rIter, &mSWBBehavior);
+    MR::getJMapInfoArg4NoInit(rIter, &mCollisionBehavior);
 
     if(mSnapRadius <= 0.0f){
         mSnapRadius = 100000.0f;
@@ -74,6 +79,9 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     }
     if(mSWBBehavior < 0 || mSWBBehavior > 1){
         mSWBBehavior = 1;
+    }
+    if(mCollisionBehavior < 0 || mCollisionBehavior > 1){
+        mCollisionBehavior = 0;
     }
 
     mSnapRadius /= 1000.0f;
@@ -88,10 +96,11 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     initRailRider(rIter);
     pt::initRailToNearestAndRepositionWithGravity(this);
 
-    initHitSensor(3);
+    initHitSensor(4);
     MR::addHitSensorBinder(this, "Snap", 4, mSnapRadius, TVec3f(0.0f, 0.0f, 0.0f));
     MR::addHitSensor(this, "Spinning", ATYPE_PLAYER, 6, 200.0f, TVec3f(0.0f, 0.0f, 0.0f));
     MR::addHitSensor(this, "Damage", ATYPE_PLAYER, 4, 75.0f, TVec3f(0.0f, 0.0f, 0.0f));
+    initBinder(75.0f, 0.0f, 0);
 
     initNerve(&NrvGrindRail::NrvWait::sInstance, 0);
     makeActorAppeared();
@@ -125,6 +134,7 @@ void GrindRail::attackSensor(HitSensor* pSender, HitSensor* pReceiver){
 
 bool GrindRail::receiveMsgEnemyAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver){
 
+
     if(isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance) && pReceiver == getSensor("Damage")){
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
         MR::endBindAndPlayerWait(this);
@@ -140,6 +150,7 @@ bool GrindRail::receiveMsgEnemyAttack(u32 msg, HitSensor *pSender, HitSensor *pR
 
 bool GrindRail::receiveOtherMsg(u32 msg, HitSensor* pSender, HitSensor* pReceiver){
 
+
     if(isNerve(&NrvGrindRail::NrvWait::sInstance) && MR::isMsgAutoRushBegin(msg) && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0 && ((MR::isValidSwitchA(this) && MR::isOnSwitchA(this)) || !MR::isValidSwitchA(this))){
         setNerve(&NrvGrindRail::NrvSnapPlayerToRail::sInstance);
         return true;
@@ -153,8 +164,10 @@ bool GrindRail::receiveOtherMsg(u32 msg, HitSensor* pSender, HitSensor* pReceive
         return true;
     }
     else{
+
         return false;
     }
+
 
 }
 
@@ -178,47 +191,20 @@ void GrindRail::exePlayerOnRail() {
         MR::onSwitchB(this);
     }
 
-    // rip terry
+    if (MR::isBindedWall(this) || MR::isBindedRoof(this) || MR::isBindedGround(this)) {
+        if(mCollisionBehavior == 1){
+            mWallBonkDeath = true;
+        }
+
+        TVec3f oppVec = MR::getRailDirection(this);
+        oppVec.scale(-1.0f);
+        MR::endBindAndPlayerDamage(this, oppVec);
+        setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
+        return;
+
+    }
 
     MR::stopPlayerFpView();
-
-    if (MR::isPlayerDamaging() && MR::getPlayerLife() > 0 && !MR::isPlayerParalyzing()) {
-
-        if (mDamageResetDelay <= 0) {
-            mDamageResetDelay = 5;
-        }
-        TVec3f damageDir = MR::getRailDirection(this);
-        damageDir.scale(-1.0f);
-        damageDir.normalize(damageDir);
-        MR::getRailDirection(this);
-        MR::endBindAndPlayerDamage(this, damageDir);
-
-    }
-    else {
-
-        mDamageResetDelay = 0;
-
-    }
-
-    if (mDamageResetDelay > 0) {
-
-        mDamageResetDelay--;
-        if (mDamageResetDelay == 0) {
-
-            MR::resetPlayerStatus();
-            MR::startBckPlayer("SlidingRopeWait", static_cast< const char* >(nullptr));
-            MR::becomeContinuousBckPlayer();
-
-        }
-    }
-
-    if (MR::isPlayerParalyzing()) {
-        MR::endBindAndPlayerElectricDamage(this);
-    }
-
-    if(MR::getPlayerLife() <= 0){
-        MR::endBindAndPlayerWait(this);
-    }
 
     if (MR::isFirstStep(this) || mAnimWait == 26) {
         
@@ -291,17 +277,23 @@ void GrindRail::exePlayerOnRail() {
 
 
 void GrindRail::exeJumpingOff() {
-    
-    if (MR::isGreaterEqualStep(this, mReattachDelay)) {
-        setNerve(&NrvGrindRail::NrvWait::sInstance);
-    }
+    if(!mWallBonkDeath){
+        if (MR::isGreaterEqualStep(this, mReattachDelay)) {
+            setNerve(&NrvGrindRail::NrvWait::sInstance);
+        }
 
-    if (MR::isValidSwitchB(this) && mSWBBehavior == 0) {
-        MR::offSwitchB(this);
-    }
+        if (MR::isValidSwitchB(this) && mSWBBehavior == 0) {
+            MR::offSwitchB(this);
+        }
 
-    mHasSpinned = false;
-    mAnimWait = 0;
+        mHasSpinned = false;
+        mAnimWait = 0;
+    }
+    else{
+        if (MR::isGreaterEqualStep(this, 10)) {
+            MR::forceKillPlayerByAbyss();
+        }
+    }
 }
 
 

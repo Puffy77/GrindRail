@@ -26,6 +26,7 @@ public:
     s32 mJumpAtEdge;
     s32 mReattachDelay;
     s32 mSWBBehavior;
+    s32 mCollisionBehavior;
 
     f32 mPointSpeed;
     f32 mPointAccel;
@@ -43,5 +44,6 @@ public:
     s32 mDamageResetDelay;
     TVec3f mLastUpVec;
     TVec3f mLastSideVec;
+    bool mWallBonkDeath;
 
 };
