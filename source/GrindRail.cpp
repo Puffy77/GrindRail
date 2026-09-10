@@ -54,7 +54,6 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
 GrindRail::~GrindRail() { }
 
 void GrindRail::init(const JMapInfoIter &rIter) {
-    OSReport("Init\n");
 
     MR::onCalcGravity(this);
     MR::connectToScene(this, 0x28, -1, -1, -1);
@@ -89,8 +88,10 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     initRailRider(rIter);
     pt::initRailToNearestAndRepositionWithGravity(this);
 
-    initHitSensor(1);
-    MR::addHitSensorBinder(this, "Snap", 1, mSnapRadius, TVec3f(0.0f, 0.0f, 0.0f));
+    initHitSensor(3);
+    MR::addHitSensorBinder(this, "Snap", 4, mSnapRadius, TVec3f(0.0f, 0.0f, 0.0f));
+    MR::addHitSensor(this, "Spinning", ATYPE_PLAYER, 6, 200.0f, TVec3f(0.0f, 0.0f, 0.0f));
+    MR::addHitSensor(this, "Damage", ATYPE_PLAYER, 4, 75.0f, TVec3f(0.0f, 0.0f, 0.0f));
 
     initNerve(&NrvGrindRail::NrvWait::sInstance, 0);
     makeActorAppeared();
@@ -111,9 +112,20 @@ void GrindRail::exeWait(){
 
 }
 
+
+
+void GrindRail::attackSensor(HitSensor* pSender, HitSensor* pReceiver){
+
+    if(mHasSpinned && pSender == getSensor("Spinning")){
+        bool out = MR::sendMsgPlayerPunch(pReceiver, pSender);
+        OSReport("Spin Attack BANG, %d\n", out);
+    }
+
+}
+
 bool GrindRail::receiveMsgEnemyAttack(u32 msg, HitSensor *pSender, HitSensor *pReceiver){
 
-    if(isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance)){
+    if(isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance) && pReceiver == getSensor("Damage")){
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
         MR::endBindAndPlayerWait(this);
         bool out = MR::getPlayerBodySensor()->receiveMessage(msg, pSender);
@@ -125,8 +137,8 @@ bool GrindRail::receiveMsgEnemyAttack(u32 msg, HitSensor *pSender, HitSensor *pR
 }
 
 
+
 bool GrindRail::receiveOtherMsg(u32 msg, HitSensor* pSender, HitSensor* pReceiver){
-    //OSReport("receiveOtherMsg %X\n", msg);
 
     if(isNerve(&NrvGrindRail::NrvWait::sInstance) && MR::isMsgAutoRushBegin(msg) && !MR::isPlayerJumpRising() && MR::getPlayerLife() > 0 && ((MR::isValidSwitchA(this) && MR::isOnSwitchA(this)) || !MR::isValidSwitchA(this))){
         setNerve(&NrvGrindRail::NrvSnapPlayerToRail::sInstance);
@@ -143,13 +155,19 @@ bool GrindRail::receiveOtherMsg(u32 msg, HitSensor* pSender, HitSensor* pReceive
     else{
         return false;
     }
+
 }
 
+
+
 void GrindRail::exeSnapPlayerToRail() {
+
     MR::setPlayerPos(mNearestPos);
     setNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance);
     MR::getCurrentRailPointArg0NoInit(this, &mCurrentSpeed);
+
 }
+
 
 
 void GrindRail::exePlayerOnRail() {
@@ -211,7 +229,11 @@ void GrindRail::exePlayerOnRail() {
 
     getPointArgs();
 
-    if(MR::isPadSwing(0) && mAllowSpinning == 1 && !mHasSpinned){
+    if(mHasSpinned){
+        mHasSpinned = false;
+    }
+
+    if(MR::isPadSwing(0) && mAllowSpinning == 1 && mAnimWait == 0){
         MR::changePlayerAnimAndStartBvaIfExist("SpinGround");
 
         mHasSpinned = true;
@@ -220,7 +242,6 @@ void GrindRail::exePlayerOnRail() {
 
     mAnimWait--;
     if(mAnimWait <= 0){
-        mHasSpinned = false;
         mAnimWait = 0;
     }
 
@@ -240,7 +261,6 @@ void GrindRail::exePlayerOnRail() {
     
     if (MR::getPlayerTriggerA() && !jumpedFromEdge && mAllowJumping == 1) {
         MR::changePlayerAnimAndStartBvaIfExist("JumpBack");
-        //OSReport("Normal Jump\n");
         MR::endBindAndPlayerJump(this, getJumpVec(mCurrentSpeed, 3), 0);
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
         return;
@@ -261,7 +281,6 @@ void GrindRail::exePlayerOnRail() {
             MR::onSwitchB(this);
         }
         
-        //OSReport("Edge Jump\n");
         MR::endBindAndPlayerJump(this, getJumpVec(mCurrentSpeed, mJumpAtEdge), 0);
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
         
@@ -269,8 +288,10 @@ void GrindRail::exePlayerOnRail() {
 
 }
 
+
+
 void GrindRail::exeJumpingOff() {
-    //OSReport("OffRail\n");
+    
     if (MR::isGreaterEqualStep(this, mReattachDelay)) {
         setNerve(&NrvGrindRail::NrvWait::sInstance);
     }
@@ -283,12 +304,13 @@ void GrindRail::exeJumpingOff() {
     mAnimWait = 0;
 }
 
+
+
 TVec3f GrindRail::getJumpVec(f32 currentSpeed, s32 includeJump){
 
     TVec3f railDirection;
     railDirection = MR::getRailDirection(this);
     railDirection.normalize(railDirection);
-    //OSReport("Rail Direction: %f, %f, %f\n", railDirection.x, railDirection.y, railDirection.z);
 
     TVec3f jumpVec = -mGravity;
     jumpVec.normalize(jumpVec);
@@ -345,11 +367,11 @@ TVec3f GrindRail::getJumpVec(f32 currentSpeed, s32 includeJump){
         finalVec += orthogonalLRVec;
     }
 
-    OSReport("Perpendicular Vector: %f, %f, %f\n", momentumJumpVec.x, momentumJumpVec.y, momentumJumpVec.z);
-    OSReport("Final Jump Vector: %f, %f, %f\n", finalVec.x, finalVec.y, finalVec.z);
     return finalVec;
 
 }
+
+
 
 void GrindRail::updatePlayerMtx(){
 
@@ -423,6 +445,8 @@ void GrindRail::updatePlayerMtx(){
 
 }
 
+
+
 void GrindRail::getPointArgs(){
 
     f32 pointSpeed = 20.0f;
@@ -483,6 +507,5 @@ void GrindRail::getPointArgs(){
         mAllowSpinning = 1;
     }
 
-    OSReport("Point Args: %f, %f, %f, %f, %d, %d, %f, %d\n", mPointSpeed, mPointAccel, mMomentumType, mMomentumInfluence, mLRJumpingStrength, mAllowJumping, mJumpStrength, mAllowSpinning);
     
 }
