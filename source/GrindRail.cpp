@@ -36,7 +36,7 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mSWBBehavior = 1;
     mCollisionBehavior = 0;
 
-    mPointSpeed = 20.0f;
+    mPointSpeed = 20000.0f;
     mPointAccel = 1000.0f;
     mMomentumType = 0;
     mMomentumInfluence = 1000.0f;
@@ -181,15 +181,13 @@ void GrindRail::exeSnapPlayerToRail() {
 
     MR::setPlayerPos(mNearestPos);
     setNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance);
-    MR::getCurrentRailPointArg0NoInit(this, &mCurrentSpeed);
     MR::startActionSound(this, "Attach", -1, -1, -1);
+
 }
 
 
 
 void GrindRail::exePlayerOnRail() {
-
-    bool jumpedFromEdge = false;
 
     if (MR::isValidSwitchB(this) && mSWBBehavior == 0) {
         MR::onSwitchB(this);
@@ -253,7 +251,7 @@ void GrindRail::exePlayerOnRail() {
     }
     
     
-    if (MR::getPlayerTriggerA() && !jumpedFromEdge && mAllowJumping == 1) {
+    if (MR::getPlayerTriggerA() && mAllowJumping == 1) {
         MR::changePlayerAnimAndStartBvaIfExist("JumpBack");
         MR::endBindAndPlayerJump(this, getJumpVec(mCurrentSpeed, 3), 0);
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
@@ -261,8 +259,6 @@ void GrindRail::exePlayerOnRail() {
     }
 
     if(mRailRider->isReachedGoal() || mRailRider->isReachedEdge()){
-
-        jumpedFromEdge = true;
 
         if (mJumpAtEdge & 1) {
             MR::changePlayerAnimAndStartBvaIfExist("GrowPlantJump");
@@ -309,6 +305,7 @@ void GrindRail::exeJumpingOff() {
             MR::forceKillPlayerByAbyss();
         }
     }
+
 }
 
 
@@ -456,7 +453,7 @@ void GrindRail::updatePlayerMtx(){
 
 void GrindRail::getPointArgs(){
 
-    f32 pointSpeed = 20.0f;
+    f32 pointSpeed = 20000.0f;
     f32 pointAccel = 1000.0f;
     f32 momentumType = 0.0f;
     f32 momentumInfluence = 1000.0f;
@@ -480,7 +477,7 @@ void GrindRail::getPointArgs(){
     
 
     
-    mPointSpeed = pointSpeed;
+    mPointSpeed = pointSpeed / 1000.0f;
     mPointAccel = pointAccel / 1000.0f;
     mMomentumType = (s32)momentumType;
     mMomentumInfluence = momentumInfluence / 1000.0f;
@@ -502,13 +499,13 @@ void GrindRail::getPointArgs(){
         mMomentumInfluence = 1.0f;
     }
     if(mLRJumpingStrength < 0.0f) {
-        mLRJumpingStrength = 5000.0f;
+        mLRJumpingStrength = 5.0f;
     }
     if(mAllowJumping < 0 || mAllowJumping > 1) {
         mAllowJumping = 1;
     }
     if(mJumpStrength <= 0.0f) {
-        mJumpStrength = 25000.0f;
+        mJumpStrength = 25.0f;
     }
     if(mAllowSpinning < 0 || mAllowSpinning > 1) {
         mAllowSpinning = 1;
