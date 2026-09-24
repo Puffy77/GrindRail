@@ -259,7 +259,7 @@ void GrindRail::exePlayerOnRail() {
         return;
     }
 
-    if(mRailRider->isReachedGoal() || mRailRider->isReachedEdge()){
+    if(mRailRider->isReachedGoal()){
 
         if (mJumpAtEdge & 1) {
             MR::changePlayerAnimAndStartBvaIfExist("GrowPlantJump");
