@@ -1,7 +1,8 @@
 #include "GrindRail.h"
 
 namespace pt {
-    extern void initRailToNearestAndRepositionWithGravity(LiveActor* pActor);
+    extern void initRailToNearestAndRepositionWithGravity(LiveActor *pActor);
+    extern void turnToDirectionUpFront(LiveActor *pActor, TVec3f rUp, TVec3f rFront);
 }
 
 namespace NrvGrindRail {
@@ -96,6 +97,9 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     initRailRider(rIter);
     pt::initRailToNearestAndRepositionWithGravity(this);
 
+    initEffectKeeper(1, "GrindRail", false);
+    initSound(2, "GrindRail", &mTranslation, TVec3f(0.0f, 0.0f, 0.0f));
+
     initHitSensor(4);
     MR::addHitSensorBinder(this, "Snap", 4, mSnapRadius, TVec3f(0.0f, 0.0f, 0.0f));
     MR::addHitSensor(this, "Spinning", ATYPE_PLAYER, 6, 200.0f, TVec3f(0.0f, 0.0f, 0.0f));
@@ -178,7 +182,7 @@ void GrindRail::exeSnapPlayerToRail() {
     MR::setPlayerPos(mNearestPos);
     setNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance);
     MR::getCurrentRailPointArg0NoInit(this, &mCurrentSpeed);
-
+    MR::startActionSound(this, "Attach", -1, -1, -1);
 }
 
 
@@ -199,19 +203,24 @@ void GrindRail::exePlayerOnRail() {
         TVec3f oppVec = MR::getRailDirection(this);
         oppVec.scale(-1.0f);
         MR::endBindAndPlayerDamage(this, oppVec);
+        MR::emitEffect(this, "Collision");
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
         return;
 
     }
 
     MR::stopPlayerFpView();
+    MR::emitEffect(this, "Spark");
 
     if (MR::isFirstStep(this) || mAnimWait == 26) {
-        
+        if(MR::isFirstStep(this)){
+            MR::startSound(this, "SE_PM_LV_SKATE_SLIP");
+        }
         MR::startBckPlayer("SlidingRopeWait", static_cast< const char* >(nullptr));
         MR::becomeContinuousBckPlayer();
     
     }
+
 
     getPointArgs();
 
@@ -221,7 +230,6 @@ void GrindRail::exePlayerOnRail() {
 
     if(MR::isPadSwing(0) && mAllowSpinning == 1 && mAnimWait == 0){
         MR::changePlayerAnimAndStartBvaIfExist("SpinGround");
-
         mHasSpinned = true;
         mAnimWait = 60;
     }
@@ -277,6 +285,12 @@ void GrindRail::exePlayerOnRail() {
 
 
 void GrindRail::exeJumpingOff() {
+
+    if(MR::isFirstStep(this)){
+        MR::startActionSound(this, "JumpingOff", -1, -1, -1);
+        MR::stopSound(this, "SE_PM_LV_SKATE_SLIP", 0);
+    }
+
     if(!mWallBonkDeath){
         if (MR::isGreaterEqualStep(this, mReattachDelay)) {
             setNerve(&NrvGrindRail::NrvWait::sInstance);
@@ -286,6 +300,7 @@ void GrindRail::exeJumpingOff() {
             MR::offSwitchB(this);
         }
 
+        
         mHasSpinned = false;
         mAnimWait = 0;
     }
