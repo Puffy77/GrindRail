@@ -41,7 +41,6 @@ public:
     TVec3f mNearestPos;
     bool mHasSpinned;
     s32 mAnimWait;
-    s32 mDamageResetDelay;
     TVec3f mLastUpVec;
     TVec3f mLastSideVec;
     bool mWallBonkDeath;
