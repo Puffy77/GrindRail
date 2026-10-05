@@ -115,7 +115,6 @@ void GrindRail::init(const JMapInfoIter &rIter) {
 void GrindRail::control() {}
 
 
-
 void GrindRail::exeWait(){
 
     TVec3f playerPos = *MR::getPlayerPos();
@@ -224,7 +223,7 @@ void GrindRail::exePlayerOnRail() {
 
     getPointArgs();
 
-    if(mHasSpinned){
+    if(mHasSpinned && mAnimWait == 40){
         mHasSpinned = false;
     }
 
@@ -275,6 +274,11 @@ void GrindRail::exePlayerOnRail() {
         MR::endBindAndPlayerJump(this, getJumpVec(mCurrentSpeed, mJumpAtEdge), 0);
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
         
+    }
+
+    if(MR::isCurrentRushSpinDriver()){
+        MR::endBindAndPlayerWait(this);
+        setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
     }
 
 }

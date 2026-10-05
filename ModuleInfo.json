@@ -1,7 +1,7 @@
 {
   "Name": "GrindRail",
   "Author": "Puffy",
-  "Description": "Grind Rails",
+  "Description": "Grind Rails in SMG2!",
   "InstallDependencies": ["Syati_ObjectFactories", "Syati_Init"],
   "SupportedGames": [
     "SB4"
