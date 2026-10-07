@@ -130,11 +130,11 @@ void GrindRail::exeWait(){
 
 void GrindRail::attackSensor(HitSensor* pSender, HitSensor* pReceiver){
 
-    if(mHasSpinned && pSender == getSensor("Spinning")){
+    if(isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance) && mHasSpinned && pSender == getSensor("Spinning")){
         MR::sendMsgPlayerPunch(pReceiver, pSender);
     }
 
-    if(pSender == getSensor("Damage")){
+    if(isNerve(&NrvGrindRail::NrvPlayerOnRail::sInstance) && pSender == getSensor("Damage")){
         MR::tryGetItem(pSender, pReceiver);
     }
 
