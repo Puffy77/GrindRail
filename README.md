@@ -6,7 +6,7 @@ Requires a Path to work, and its recommended to be paired with a collisionless v
 | Arg | Name | Description | Default
 |---|---|---|---
 | 0 | Snap Radius | How far the player needs to be from the rail to start grinding, times 1000.<br> (i.e a value of 250,000 = 250.000) | 100,000 (100.000)
-| 1 | Jump Behavior at End | When reaching the rail's end, how should the player detatch?<br> (Bit 0: Jump, Bit 1: Allow Left-Right Influence) | 1
+| 1 | Jump Behavior at End | When reaching the rail's end, how should the player detatch?<br> (Bit 0: Force Jump?, Bit 1: Allow Left-Right Influence) | 1
 | 2 | Reattatch Delay | After leaving the rail, how long (in frames) until the player can reattatch to the rail? | 30
 | 3 | SW_B Behavior | When should SW_B Activate?<br> (0: While riding rail, 1: When reaching the rail's end) | 1
 | 4 | Collision Behavior | How should the player react when hitting a surface while grinding?<br>(0: Damage, 1: Death) | 0
