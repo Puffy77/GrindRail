@@ -101,8 +101,8 @@ void GrindRail::init(const JMapInfoIter &rIter) {
 
     initHitSensor(3);
     MR::addHitSensorBinder(this, "Snap", 4, mSnapRadius, TVec3f(0.0f, 0.0f, 0.0f));
-    MR::addHitSensor(this, "Spinning", ATYPE_PLAYER, 6, 200.0f, TVec3f(0.0f, 0.0f, 0.0f));
-    MR::addHitSensor(this, "Damage", ATYPE_PLAYER, 4, 75.0f, TVec3f(0.0f, 0.0f, 0.0f));
+    MR::addHitSensorRide(this, "Spinning", 6, 200.0f, TVec3f(0.0f, 0.0f, 0.0f));
+    MR::addHitSensorRide(this, "Damage", 4, 75.0f, TVec3f(0.0f, 0.0f, 0.0f));
     initBinder(75.0f, 0.0f, 0);
 
     initNerve(&NrvGrindRail::NrvWait::sInstance, 0);
