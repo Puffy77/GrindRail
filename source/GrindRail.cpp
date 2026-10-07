@@ -99,7 +99,7 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     initEffectKeeper(1, "GrindRail", false);
     initSound(2, "GrindRail", &mTranslation, TVec3f(0.0f, 0.0f, 0.0f));
 
-    initHitSensor(4);
+    initHitSensor(3);
     MR::addHitSensorBinder(this, "Snap", 4, mSnapRadius, TVec3f(0.0f, 0.0f, 0.0f));
     MR::addHitSensor(this, "Spinning", ATYPE_PLAYER, 6, 200.0f, TVec3f(0.0f, 0.0f, 0.0f));
     MR::addHitSensor(this, "Damage", ATYPE_PLAYER, 4, 75.0f, TVec3f(0.0f, 0.0f, 0.0f));
@@ -132,6 +132,10 @@ void GrindRail::attackSensor(HitSensor* pSender, HitSensor* pReceiver){
 
     if(mHasSpinned && pSender == getSensor("Spinning")){
         MR::sendMsgPlayerPunch(pReceiver, pSender);
+    }
+
+    if(pSender == getSensor("Damage")){
+        MR::tryGetItem(pSender, pReceiver);
     }
 
 }
