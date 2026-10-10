@@ -1,4 +1,28 @@
 #include "GrindRail.h"
+#include "JSystem/JMATrigonometric.h"
+#include "revolution/gx/GXDispList.h"
+#include "revolution/gx/GXEnum.h"
+#include "revolution/gx/GXGeometry.h"
+#include "revolution/gx/GXLighting.h"
+#include "revolution/gx/GXStruct.h"
+#include "revolution/gx/GXTransform.h"
+#include "revolution/gx/GXVert.h"
+#include "revolution/gd/GDBase.h"
+
+namespace {
+
+    inline f32 toRadian(f32 angle) {
+        return angle * (JMath::PI / 180.0f);
+    }
+
+    static const f32 sTexRateU0 = 0.05f;
+    static const f32 sTexRateV0 = 0.0001f;
+    static const f32 sTexRateU1 = 0.05f;
+    static const f32 sTexRateV1 = 0.0001f;
+    static const f32 sTexRateU2 = 0.1f;
+    static const f32 sTexRateV2 = 0.0001f;
+
+}
 
 namespace pt {
     extern void initRailToNearestAndRepositionWithGravity(LiveActor *pActor);
@@ -36,6 +60,7 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mReattachDelay = 30;
     mSWBBehavior = 1;
     mCollisionBehavior = 0;
+    mDrawRails = 0;
 
     mPointSpeed = 20000.0f;
     mPointAccel = 1000.0f;
@@ -54,6 +79,23 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mLastSideVec.set(0.0f, 0.0f, 0.0f);
     mWallBonkDeath = false;
 
+    mDrawer = NULL;
+}
+
+GrindRailDrawer::GrindRailDrawer(GrindRail *pGrindRail){
+
+    mNumPoints = 0;
+    mNumLinePoints = 0;
+    mNumLoopPoints = 6;
+    mPoints = NULL;
+    mNormals = NULL;
+    mRailCoords = NULL;
+    mDispListLength = 0;
+    mDispList = 0;
+
+    initPoints(pGrindRail);
+    initDisplayList();
+
 }
 
 GrindRail::~GrindRail() { }
@@ -61,13 +103,14 @@ GrindRail::~GrindRail() { }
 void GrindRail::init(const JMapInfoIter &rIter) {
 
     MR::onCalcGravity(this);
-    MR::connectToScene(this, 0x28, -1, -1, -1);
+    MR::connectToScene(this, 0x28, -1, -1, MR::DrawType_WaterRoad);
 
     MR::getJMapInfoArg0NoInit(rIter, &mSnapRadius);
     MR::getJMapInfoArg1NoInit(rIter, &mJumpAtEdge);
     MR::getJMapInfoArg2NoInit(rIter, &mReattachDelay);
     MR::getJMapInfoArg3NoInit(rIter, &mSWBBehavior);
     MR::getJMapInfoArg4NoInit(rIter, &mCollisionBehavior);
+    MR::getJMapInfoArg5NoInit(rIter, &mDrawRails);
 
     if(mSnapRadius <= 0.0f){
         mSnapRadius = 100000.0f;
@@ -83,6 +126,9 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     }
     if(mCollisionBehavior < 0 || mCollisionBehavior > 1){
         mCollisionBehavior = 0;
+    }
+    if(mDrawRails < 0 || mDrawRails > 1){
+        mDrawRails = 1;
     }
 
     mSnapRadius /= 1000.0f;
@@ -105,12 +151,27 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::addHitSensorRide(this, "Damage", 4, 75.0f, TVec3f(0.0f, 0.0f, 0.0f));
     initBinder(75.0f, 0.0f, 0);
 
+    if(mDrawRails == 1){
+        mDrawer = new GrindRailDrawer(this);
+    }
+    
     initNerve(&NrvGrindRail::NrvWait::sInstance, 0);
     makeActorAppeared();
-    
+
 }
 
+void GrindRail::draw() const {
+        OSReport("Running draw. \n");
+    if (!MR::isValidDraw(this)) {
+        return;
+    }
 
+    if (mDrawer){
+        OSReport("Calling drawGD. \n");
+        mDrawer->drawGD();
+    }
+
+}
 
 void GrindRail::control() {}
 
@@ -181,7 +242,9 @@ bool GrindRail::receiveOtherMsg(u32 msg, HitSensor* pSender, HitSensor* pReceive
 
 }
 
+void GrindRail::initDraw(){
 
+}
 
 void GrindRail::exeSnapPlayerToRail() {
 
@@ -512,5 +575,217 @@ void GrindRail::getPointArgs(){
     if(mAllowSpinning < 0 || mAllowSpinning > 1) {
         mAllowSpinning = 1;
     }
+
+}
+
+
+
+void GrindRailDrawer::initPoints(GrindRail* pGrindRail){
+
+    s32 numPointsHolder;
+    s32 pointInterval = 100;
+
+    MR::moveCoordToStartPos(pGrindRail);
+
+    // Adjust the 100 as needed later 
+    s32 numTestPoints = static_cast< s32 >(MR::getRailTotalLength(pGrindRail) / pointInterval) + 1;
+    f32 testDelta = MR::getRailTotalLength(pGrindRail) / (numTestPoints - 1);
+
+    TVec3f testRailDir = MR::getRailDirection(pGrindRail);
+
+    s32 numPoints = 1;
+    for (s32 idx = 1; idx < numTestPoints; idx++) {
+        MR::moveCoord(pGrindRail, testDelta);
+
+        if (MR::getRailDirection(pGrindRail).dot(testRailDir) < 0.995f) {
+            numPoints++;
+            testRailDir.set(MR::getRailDirection(pGrindRail));
+        }
+
+    }
+
+    numPointsHolder = numPoints;
+
+    static const f32 sFloatToShortShift = 32768.0f;
+
+    mNumLinePoints = numPoints < 2 ? 2 : numPoints;
+    mNumPoints = mNumLinePoints * mNumLoopPoints;
+
+    f32 lineDelta = MR::getRailTotalLength(pGrindRail) / static_cast< s32 >(MR::getRailTotalLength(pGrindRail) / pointInterval);
+
+
+    TVec3f up = TVec3f(0.0, 1.0, 0.0);
+    f32 loopInterval = ::toRadian(360.0f / mNumLoopPoints);
+
+    mPoints = new (0x20) TVec3f[mNumPoints];
+    mNormals = new (0x20) TVec3s[mNumPoints];
+    mRailCoords = new f32[mNumPoints];
+
+    MR::moveCoordToStartPos(pGrindRail);
+    TVec3f front = MR::getRailDirection(pGrindRail);
+
+    s32 pointIdx = 0;
+    for (s32 lineIdx = 0; lineIdx < mNumLinePoints; lineIdx++) {
+        if (lineIdx == mNumLinePoints - 1) {
+            MR::moveCoordToEndPos(pGrindRail);
+        }
+
+        TVec3f side = MR::getRailDirection(pGrindRail).cross(up);
+        MR::normalize(&side);
+
+        TPos3f loopRot;
+        loopRot.identity();
+        TVec3f rotAxis = MR::getRailDirection(pGrindRail) * -1.0f;
+        loopRot.setRotate(rotAxis, loopInterval);
+
+        TVec3f raildir = MR::getRailDirection(pGrindRail);
+        PSVECCrossProduct(side, raildir, up);
+
+        mRailCoords[lineIdx] = MR::getRailCoord(pGrindRail);
+
+        for (s32 loopIdx = 0; loopIdx < mNumLoopPoints; loopIdx++) {
+            TVec3f pos = side;
+            pos.scale(25.0f);
+            pos.add(MR::getRailPos(pGrindRail));
+            mPoints[pointIdx].set(pos);
+            mNormals[pointIdx].set(side.x * sFloatToShortShift, side.y * sFloatToShortShift, side.z * sFloatToShortShift);
+            pointIdx++;
+            loopRot.mult(side, side);
+        }
+
+        while (pointIdx < mNumPoints && !MR::isRailReachedGoal(pGrindRail) && MR::getRailDirection(pGrindRail).dot(front) > 0.995f) {
+            MR::moveCoord(pGrindRail, lineDelta);
+        }
+
+        front.set(MR::getRailDirection(pGrindRail));
+
+    }
+
+}
+
+
+
+void GrindRailDrawer::initDisplayList(){
+
+    MR::ProhibitSchedulerAndInterrupts scheduler(false);
+
+    u32 GDDataSize = (((((false ? sizeof(f32) * 4 : sizeof(f32) * 6) + sizeof(u16) * 2) * 2) * mNumLinePoints) + sizeof(u8) + sizeof(u16)) * mNumLoopPoints;
+
+    u32 length = ((GDDataSize / 32) + 2) * 32;
+    mDispList = new (0x20) u8[length];
+    DCInvalidateRange(mDispList, length);
+    GDLObj obj;
+    GDInitGDLObj(&obj, mDispList, length);
+    GDSetCurrent(&obj);
+    sendGD();
+    GDPadCurr32();
+    mDispListLength = GDGetGDLObjOffset(&obj);
+    DCStoreRange(mDispList, length);
+
+}
+
+void GrindRailDrawer::sendGD() const{
+
+    f32 texU0A = 0.0f;
+    f32 texU0B = ::sTexRateU0;
+    f32 texU1A = 0.0f;
+    f32 texU1B = ::sTexRateU1;
+    f32 texU2A = 0.0f;
+    f32 texU2B = ::sTexRateU2;
+
+    for (s32 loopIdx = 0; loopIdx < mNumLoopPoints; loopIdx++) {
+        s32 nextLoopIdx = loopIdx + 1;
+        if (loopIdx == mNumLoopPoints - 1) {
+            nextLoopIdx = 0;
+        }
+
+        u16 numPoints = mNumLinePoints * 2;
+        GDWrite_u8(GX_TRIANGLESTRIP);
+        GDWrite_u16(numPoints);
+
+        for (s32 lineIdx = 0; lineIdx < mNumLinePoints; lineIdx++) {
+            f32 texV0 = mRailCoords[lineIdx] * ::sTexRateV0;
+            f32 texV1 = mRailCoords[lineIdx] * ::sTexRateV1;
+            f32 texV2 = mRailCoords[lineIdx] * ::sTexRateV2;
+
+            u16 pointIdx = calcPointIndex(lineIdx, loopIdx);
+            u16 nextIdx = calcPointIndex(lineIdx, nextLoopIdx);
+
+            GDWrite_u16(pointIdx);
+            GDWrite_u16(pointIdx);
+            GDWrite_f32(texU0A);
+            GDWrite_f32(texV0);
+            GDWrite_f32(texU1A);
+            GDWrite_f32(texV1);
+            
+            GDWrite_f32(texU2A);
+            GDWrite_f32(texV2);
+            
+
+            GDWrite_u16(nextIdx);
+            GDWrite_u16(nextIdx);
+            GDWrite_f32(texU0B);
+            GDWrite_f32(texV0);
+            GDWrite_f32(texU1B);
+            GDWrite_f32(texV1);
+        
+            GDWrite_f32(texU2B);
+            GDWrite_f32(texV2);
+            
+        }
+
+        texU0A = texU0B;
+        texU1A = texU1B;
+        texU2A = texU2B;
+        texU0B += ::sTexRateU0;
+        texU1B += ::sTexRateU1;
+        texU2B += ::sTexRateU2;
+
+    }
+
+}
+
+void GrindRailDrawer::drawGD() const{
+
+    loadMaterialHigh();
+    GXCallDisplayList(mDispList, mDispListLength);
+
+}
+
+void GrindRailDrawer::loadMaterialHigh() const{
+
+    GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+    GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_NRM, GX_POS_XY, GX_S16, 16);
+
+    GXClearVtxDesc();
+
+    GXSetVtxDesc(GX_VA_POS, GX_INDEX16);
+    GXSetVtxDesc(GX_VA_NRM, GX_INDEX16);
+
+    GXSetArray(GX_VA_POS, mPoints, sizeof(TVec3f));
+    GXSetArray(GX_VA_NRM, mNormals, sizeof(TVec3s));
+    GXLoadPosMtxImm(MR::getCameraViewMtx(), 0);
+    GXLoadNrmMtxImm(MR::getCameraViewMtx(), 0);
+
+    GXSetCurrentMtx(0);
+    GXSetNumChans(0);
+
+    GXSetNumTexGens(0);
+    GXSetNumIndStages(0);
+
+    GXSetNumTevStages(1);
+        
+    GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR_NULL);
+    GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ONE);
+    GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+    GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+    GXSetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+
+    GXSetBlendMode(GX_BM_NONE, GX_BL_ONE, GX_BL_ZERO, GX_LO_NOOP);
+    GXSetAlphaCompare(GX_GREATER, 0, GX_AOP_OR, GX_GREATER, 0);
+    GXSetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+    GXSetZCompLoc(GX_TRUE);
+    GXSetCullMode(GX_CULL_NONE);
+    GXSetClipMode(GX_CLIP_ENABLE);
 
 }
