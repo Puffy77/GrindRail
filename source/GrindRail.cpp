@@ -15,8 +15,8 @@ namespace {
         return angle * (JMath::PI / 180.0f);
     }
 
-    static const f32 sTexRateU0 = 0.05f;
-    static const f32 sTexRateV0 = 0.0001f;
+    static const f32 sTexRateU0 = 1.0f;
+    static const f32 sTexRateV0 = 0.001f;
     static const f32 sTexRateU1 = 0.05f;
     static const f32 sTexRateV1 = 0.0001f;
     static const f32 sTexRateU2 = 0.1f;
@@ -80,6 +80,7 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mWallBonkDeath = false;
 
     mDrawer = NULL;
+    mTexture = NULL;
 }
 
 GrindRailDrawer::GrindRailDrawer(GrindRail *pGrindRail){
@@ -152,6 +153,7 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     initBinder(75.0f, 0.0f, 0);
 
     if(mDrawRails >= 1){
+        mTexture = new JUTTexture(MR::loadTexFromArc("GrindRail.arc", "Texture.bti", NULL), 0);
         mDrawer = new GrindRailDrawer(this);
     }
     
@@ -168,6 +170,14 @@ void GrindRail::draw() const {
 
     if (mDrawer){
         OSReport("Calling drawGD. \n");
+
+        TPos3f mtx;
+        mtx.identity();
+        mtx[0][2] = 0.0f;
+        mtx[1][2] = 0.0f;
+        GXLoadTexMtxImm(mtx, 0x1E, GX_MTX2x4);
+
+        mTexture->load(GX_TEXMAP0);
         mDrawer->drawGD();
     }
 
@@ -783,14 +793,15 @@ void GrindRailDrawer::loadMaterialHigh() const{
     GXSetCurrentMtx(0);
     GXSetNumChans(0);
 
-    GXSetNumTexGens(0);
+    GXSetNumTexGens(1);
+    GXSetTexCoordGen2(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, 0x1E, 0, 0x7D);
     GXSetNumIndStages(0);
 
     // Everything below here should be fine
     GXSetNumTevStages(1);
         
-    GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR_NULL);
-    GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ONE);
+    GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
+    GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO);
     GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
     GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
     GXSetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);

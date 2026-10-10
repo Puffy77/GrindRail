@@ -52,6 +52,7 @@ public:
     bool mWallBonkDeath;
 
     GrindRailDrawer* mDrawer;
+    JUTTexture* mTexture;
 };
 
 class GrindRailDrawer {
