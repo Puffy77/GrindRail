@@ -60,7 +60,7 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mReattachDelay = 30;
     mSWBBehavior = 1;
     mCollisionBehavior = 0;
-    mDrawRails = 0;
+    mDrawRails = 1;
 
     mPointSpeed = 20000.0f;
     mPointAccel = 1000.0f;
@@ -86,7 +86,7 @@ GrindRailDrawer::GrindRailDrawer(GrindRail *pGrindRail){
 
     mNumPoints = 0;
     mNumLinePoints = 0;
-    mNumLoopPoints = 6;
+    mNumLoopPoints = 8;
     mPoints = NULL;
     mNormals = NULL;
     mRailCoords = NULL;
@@ -127,7 +127,7 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     if(mCollisionBehavior < 0 || mCollisionBehavior > 1){
         mCollisionBehavior = 0;
     }
-    if(mDrawRails < 0 || mDrawRails > 1){
+    if(mDrawRails < 0 || mDrawRails > 8){
         mDrawRails = 1;
     }
 
@@ -151,7 +151,7 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::addHitSensorRide(this, "Damage", 4, 75.0f, TVec3f(0.0f, 0.0f, 0.0f));
     initBinder(75.0f, 0.0f, 0);
 
-    if(mDrawRails == 1){
+    if(mDrawRails >= 1){
         mDrawer = new GrindRailDrawer(this);
     }
     
@@ -583,7 +583,7 @@ void GrindRail::getPointArgs(){
 void GrindRailDrawer::initPoints(GrindRail* pGrindRail){
 
     s32 numPointsHolder;
-    s32 pointInterval = 100;
+    s32 pointInterval = 25;
 
     MR::moveCoordToStartPos(pGrindRail);
 
@@ -615,6 +615,7 @@ void GrindRailDrawer::initPoints(GrindRail* pGrindRail){
 
 
     TVec3f up = TVec3f(0.0, 1.0, 0.0);
+
     f32 loopInterval = ::toRadian(360.0f / mNumLoopPoints);
 
     mPoints = new (0x20) TVec3f[mNumPoints];
@@ -623,6 +624,11 @@ void GrindRailDrawer::initPoints(GrindRail* pGrindRail){
 
     MR::moveCoordToStartPos(pGrindRail);
     TVec3f front = MR::getRailDirection(pGrindRail);
+
+    if(front.dot(up) >= 0.999f || front.dot(up) <= -0.999f){
+        up = TVec3f(0.05, 0.95, 0.00);
+        up.normalize(up);
+    }
 
     s32 pointIdx = 0;
     for (s32 lineIdx = 0; lineIdx < mNumLinePoints; lineIdx++) {
@@ -645,7 +651,7 @@ void GrindRailDrawer::initPoints(GrindRail* pGrindRail){
 
         for (s32 loopIdx = 0; loopIdx < mNumLoopPoints; loopIdx++) {
             TVec3f pos = side;
-            pos.scale(25.0f);
+            pos.scale(10.0f);
             pos.add(MR::getRailPos(pGrindRail));
             mPoints[pointIdx].set(pos);
             mNormals[pointIdx].set(side.x * sFloatToShortShift, side.y * sFloatToShortShift, side.z * sFloatToShortShift);
@@ -756,14 +762,21 @@ void GrindRailDrawer::loadMaterialHigh() const{
 
     GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
     GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_NRM, GX_POS_XY, GX_S16, 16);
+    GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_POS_XYZ, GX_F32, 0);
+    GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX1, GX_POS_XYZ, GX_F32, 0);
+    GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX2, GX_POS_XYZ, GX_F32, 0);
 
     GXClearVtxDesc();
 
     GXSetVtxDesc(GX_VA_POS, GX_INDEX16);
     GXSetVtxDesc(GX_VA_NRM, GX_INDEX16);
+    GXSetVtxDesc(GX_VA_TEX0, GX_DIRECT);
+    GXSetVtxDesc(GX_VA_TEX1, GX_DIRECT);
+    GXSetVtxDesc(GX_VA_TEX2, GX_DIRECT);
 
     GXSetArray(GX_VA_POS, mPoints, sizeof(TVec3f));
     GXSetArray(GX_VA_NRM, mNormals, sizeof(TVec3s));
+
     GXLoadPosMtxImm(MR::getCameraViewMtx(), 0);
     GXLoadNrmMtxImm(MR::getCameraViewMtx(), 0);
 
@@ -773,6 +786,7 @@ void GrindRailDrawer::loadMaterialHigh() const{
     GXSetNumTexGens(0);
     GXSetNumIndStages(0);
 
+    // Everything below here should be fine
     GXSetNumTevStages(1);
         
     GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR_NULL);
@@ -782,7 +796,7 @@ void GrindRailDrawer::loadMaterialHigh() const{
     GXSetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
 
     GXSetBlendMode(GX_BM_NONE, GX_BL_ONE, GX_BL_ZERO, GX_LO_NOOP);
-    GXSetAlphaCompare(GX_GREATER, 0, GX_AOP_OR, GX_GREATER, 0);
+    GXSetAlphaCompare(GX_GEQUAL, 0, GX_AOP_OR, GX_GEQUAL, 0);
     GXSetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
     GXSetZCompLoc(GX_TRUE);
     GXSetCullMode(GX_CULL_NONE);
