@@ -15,12 +15,7 @@ namespace {
         return angle * (JMath::PI / 180.0f);
     }
 
-    static const f32 sTexRateU0 = 1.0f;
-    static const f32 sTexRateV0 = 0.001f;
-    static const f32 sTexRateU1 = 0.05f;
-    static const f32 sTexRateV1 = 0.0001f;
-    static const f32 sTexRateU2 = 0.1f;
-    static const f32 sTexRateV2 = 0.0001f;
+  
 
 }
 
@@ -43,6 +38,9 @@ Obj_Arg 1: Jump Behavior at Goal (Default: 1)
 Obj_Arg 2: Reattach Delay (Default: 30)
 Obj_Arg 3: SW_B Behavior (While Riding or On Reaching Goal) (Default: 1)
 Obj_Arg 4: Collision Behavior (Damage or Death) (Default: 0)
+Obj_Arg 5: Draw Rails (Default: 1)
+Obj_Arg 6: Rail Color (Default: 0)
+Obj_Arg 7: Rail Material (Default: 0)
 
 Point_Arg 0: Speed (Default: 20.0f)
 Point_Arg 1: Acceleration (Default: 1.000f)
@@ -61,6 +59,8 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mSWBBehavior = 1;
     mCollisionBehavior = 0;
     mDrawRails = 1;
+    mRailColor = 0;
+    mRailMaterial = 0;
 
     mPointSpeed = 20000.0f;
     mPointAccel = 1000.0f;
@@ -80,7 +80,10 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mWallBonkDeath = false;
 
     mDrawer = NULL;
-    mTexture = NULL;
+    mTex0 = NULL;
+    mTex1 = NULL;
+    mTexUV0.set(0.375f, 0.0f, 0.0f);
+    mTexUV1.set(0.0f, 0.0f, 0.0f);
 }
 
 GrindRailDrawer::GrindRailDrawer(GrindRail *pGrindRail){
@@ -93,6 +96,9 @@ GrindRailDrawer::GrindRailDrawer(GrindRail *pGrindRail){
     mRailCoords = NULL;
     mDispListLength = 0;
     mDispList = 0;
+
+    mColorChoice = pGrindRail->mRailColor;
+    mMaterialChoice = pGrindRail->mRailMaterial;
 
     initPoints(pGrindRail);
     initDisplayList();
@@ -112,6 +118,8 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::getJMapInfoArg3NoInit(rIter, &mSWBBehavior);
     MR::getJMapInfoArg4NoInit(rIter, &mCollisionBehavior);
     MR::getJMapInfoArg5NoInit(rIter, &mDrawRails);
+    MR::getJMapInfoArg6NoInit(rIter, &mRailColor);
+    MR::getJMapInfoArg7NoInit(rIter, &mRailMaterial);
 
     if(mSnapRadius <= 0.0f){
         mSnapRadius = 100000.0f;
@@ -128,8 +136,14 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     if(mCollisionBehavior < 0 || mCollisionBehavior > 1){
         mCollisionBehavior = 0;
     }
-    if(mDrawRails < 0 || mDrawRails > 8){
+    if(mDrawRails < 0 || mDrawRails > 1){
         mDrawRails = 1;
+    }
+    if(mRailColor < 0 || mRailColor > 8){
+        mRailColor = 0;
+    }
+    if(mRailMaterial < 0 || mRailMaterial > 1){
+        mRailMaterial = 1;
     }
 
     mSnapRadius /= 1000.0f;
@@ -152,8 +166,17 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::addHitSensorRide(this, "Damage", 4, 75.0f, TVec3f(0.0f, 0.0f, 0.0f));
     initBinder(75.0f, 0.0f, 0);
 
-    if(mDrawRails >= 1){
-        mTexture = new JUTTexture(MR::loadTexFromArc("GrindRail.arc", "Texture.bti", NULL), 0);
+    if(mDrawRails == 1){
+
+        if(mRailMaterial == 0){
+            mTex0 = new JUTTexture(MR::loadTexFromArc("GrindRail.arc", "MetalTop.bti", NULL), 0);
+            mTex1 = new JUTTexture(MR::loadTexFromArc("GrindRail.arc", "MetalBot.bti", NULL), 0);
+        }
+        else if(mRailMaterial == 1){
+            mTex0 = new JUTTexture(MR::loadTexFromArc("GrindRail.arc", "Sparkles.bti", NULL), 0);
+            mTex1 = new JUTTexture(MR::loadTexFromArc("GrindRail.arc", "Sparkles.bti", NULL), 0);
+        }
+        
         mDrawer = new GrindRailDrawer(this);
     }
     
@@ -163,7 +186,8 @@ void GrindRail::init(const JMapInfoIter &rIter) {
 }
 
 void GrindRail::draw() const {
-        OSReport("Running draw. \n");
+
+    OSReport("Running draw. \n");
     if (!MR::isValidDraw(this)) {
         return;
     }
@@ -173,17 +197,36 @@ void GrindRail::draw() const {
 
         TPos3f mtx;
         mtx.identity();
-        mtx[0][2] = 0.0f;
-        mtx[1][2] = 0.0f;
+        mtx[0][2] = mTexUV0.x;
+        mtx[1][2] = mTexUV0.y;
         GXLoadTexMtxImm(mtx, 0x1E, GX_MTX2x4);
 
-        mTexture->load(GX_TEXMAP0);
+        mTex0->load(GX_TEXMAP0);
+
+        mtx[0][2] = mTexUV1.x;
+        mtx[1][2] = mTexUV1.y;
+        GXLoadTexMtxImm(mtx, 0x21, GX_MTX2x4);
+        
+        mTex1->load(GX_TEXMAP1);
+
         mDrawer->drawGD();
+
     }
 
 }
 
-void GrindRail::control() {}
+void GrindRail::control() {
+
+    if(mRailMaterial == 0){
+        mTexUV0.x = 0.7125f;
+    }
+    else if(mRailMaterial == 1){
+        mTexUV0.x = MR::repeat(mTexUV0.x - 0.0005, 0.0f, 1.0f);
+        mTexUV0.y = MR::repeat(mTexUV0.y - 0.003, 0.0f, 1.0f);
+        mTexUV1.x = MR::repeat(mTexUV1.x + 0.0003, 0.0f, 1.0f);
+        mTexUV1.y = MR::repeat(mTexUV1.y + 0.0005, 0.0f, 1.0f);
+    }
+}
 
 
 void GrindRail::exeWait(){
@@ -593,7 +636,7 @@ void GrindRail::getPointArgs(){
 void GrindRailDrawer::initPoints(GrindRail* pGrindRail){
 
     s32 numPointsHolder;
-    s32 pointInterval = 25;
+    s32 pointInterval = 5;
 
     MR::moveCoordToStartPos(pGrindRail);
 
@@ -661,7 +704,7 @@ void GrindRailDrawer::initPoints(GrindRail* pGrindRail){
 
         for (s32 loopIdx = 0; loopIdx < mNumLoopPoints; loopIdx++) {
             TVec3f pos = side;
-            pos.scale(10.0f);
+            pos.scale(15.0f);
             pos.add(MR::getRailPos(pGrindRail));
             mPoints[pointIdx].set(pos);
             mNormals[pointIdx].set(side.x * sFloatToShortShift, side.y * sFloatToShortShift, side.z * sFloatToShortShift);
@@ -687,6 +730,7 @@ void GrindRailDrawer::initDisplayList(){
 
     u32 GDDataSize = (((((false ? sizeof(f32) * 4 : sizeof(f32) * 6) + sizeof(u16) * 2) * 2) * mNumLinePoints) + sizeof(u8) + sizeof(u16)) * mNumLoopPoints;
 
+    
     u32 length = ((GDDataSize / 32) + 2) * 32;
     mDispList = new (0x20) u8[length];
     DCInvalidateRange(mDispList, length);
@@ -702,12 +746,36 @@ void GrindRailDrawer::initDisplayList(){
 
 void GrindRailDrawer::sendGD() const{
 
+    f32 sTexRateU0;
+    f32 sTexRateV0;
+    f32 sTexRateU1;
+    f32 sTexRateV1;
+    f32 sTexRateU2;
+    f32 sTexRateV2;
+
+    if(mMaterialChoice == 0){
+        sTexRateU0 = 0.15f;
+        sTexRateV0 = 0.0001f;
+        sTexRateU1 = 0.15f;
+        sTexRateV1 = 0.0001f;
+        sTexRateU2 = 0.1f;
+        sTexRateV2 = 0.0001f;
+    }
+    else if(mMaterialChoice == 1){
+        sTexRateU0 = 0.05f;
+        sTexRateV0 = 0.005f;
+        sTexRateU1 = 0.15f;
+        sTexRateV1 = 0.0001f;
+        sTexRateU2 = 0.1f;
+        sTexRateV2 = 0.0001f;
+    }
+
     f32 texU0A = 0.0f;
-    f32 texU0B = ::sTexRateU0;
+    f32 texU0B = sTexRateU0;
     f32 texU1A = 0.0f;
-    f32 texU1B = ::sTexRateU1;
+    f32 texU1B = sTexRateU1;
     f32 texU2A = 0.0f;
-    f32 texU2B = ::sTexRateU2;
+    f32 texU2B = sTexRateU2;
 
     for (s32 loopIdx = 0; loopIdx < mNumLoopPoints; loopIdx++) {
         s32 nextLoopIdx = loopIdx + 1;
@@ -720,9 +788,9 @@ void GrindRailDrawer::sendGD() const{
         GDWrite_u16(numPoints);
 
         for (s32 lineIdx = 0; lineIdx < mNumLinePoints; lineIdx++) {
-            f32 texV0 = mRailCoords[lineIdx] * ::sTexRateV0;
-            f32 texV1 = mRailCoords[lineIdx] * ::sTexRateV1;
-            f32 texV2 = mRailCoords[lineIdx] * ::sTexRateV2;
+            f32 texV0 = mRailCoords[lineIdx] * sTexRateV0;
+            f32 texV1 = mRailCoords[lineIdx] * sTexRateV1;
+            f32 texV2 = mRailCoords[lineIdx] * sTexRateV2;
 
             u16 pointIdx = calcPointIndex(lineIdx, loopIdx);
             u16 nextIdx = calcPointIndex(lineIdx, nextLoopIdx);
@@ -753,9 +821,9 @@ void GrindRailDrawer::sendGD() const{
         texU0A = texU0B;
         texU1A = texU1B;
         texU2A = texU2B;
-        texU0B += ::sTexRateU0;
-        texU1B += ::sTexRateU1;
-        texU2B += ::sTexRateU2;
+        texU0B += sTexRateU0;
+        texU1B += sTexRateU1;
+        texU2B += sTexRateU2;
 
     }
 
@@ -793,24 +861,83 @@ void GrindRailDrawer::loadMaterialHigh() const{
     GXSetCurrentMtx(0);
     GXSetNumChans(0);
 
-    GXSetNumTexGens(1);
+    GXSetNumTexGens(2);
     GXSetTexCoordGen2(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, 0x1E, 0, 0x7D);
+    GXSetTexCoordGen2(GX_TEXCOORD1, GX_TG_MTX2x4, GX_TG_TEX1, 0x21, 0, 0x7D);
+
     GXSetNumIndStages(0);
 
-    // Everything below here should be fine
-    GXSetNumTevStages(1);
-        
-    GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
-    GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO);
-    GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
-    GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
-    GXSetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+    GXColor sTevColor0 = {0xFF, 0xFF, 0xFF, 0xFF};
+    GXColor sTevColor1 = {0x00, 0x00, 0x00, 0xFF};
 
-    GXSetBlendMode(GX_BM_NONE, GX_BL_ONE, GX_BL_ZERO, GX_LO_NOOP);
-    GXSetAlphaCompare(GX_GEQUAL, 0, GX_AOP_OR, GX_GEQUAL, 0);
-    GXSetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-    GXSetZCompLoc(GX_TRUE);
-    GXSetCullMode(GX_CULL_NONE);
-    GXSetClipMode(GX_CLIP_ENABLE);
+    if(mColorChoice == 2){
+        sTevColor0 = (GXColor){0xFF, 0x00, 0xAE, 0xFF};
+        sTevColor1 = (GXColor){0x74, 0x00, 0x16, 0xFF};
+    }
+    else if(mColorChoice == 3){
+        sTevColor0 = (GXColor){0x67, 0xFF, 0x82, 0xFF};
+        sTevColor1 = (GXColor){0x00, 0x62, 0x14, 0xFF};
+    }
+    else if(mColorChoice == 4){
+        sTevColor0 = (GXColor){0x67, 0xDA, 0xFF, 0xFF};
+        sTevColor1 = (GXColor){0x1A, 0x14, 0x92, 0xFF};
+    }
+
+    GXSetTevColor(GX_TEVREG0, sTevColor0);
+    GXSetTevColor(GX_TEVREG1, sTevColor1);
+
+    // Metal Material
+    if(mMaterialChoice == 0){
+        GXSetNumTevStages(3);
+            
+        GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
+        GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_C1, GX_CC_C0, GX_CC_TEXC, GX_CC_ZERO);
+        GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+        GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+        GXSetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+
+        GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR_NULL);
+        GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_C1, GX_CC_TEXC, GX_CC_ZERO);
+        GXSetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_2, GX_FALSE, GX_TEVREG2);
+        GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+        GXSetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+
+        GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR_NULL);
+        GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_C2, GX_CC_CPREV, GX_CC_APREV, GX_CC_ZERO);
+        GXSetTevColorOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+        GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+        GXSetTevAlphaOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+
+        GXSetBlendMode(GX_BM_NONE, GX_BL_ONE, GX_BL_ZERO, GX_LO_NOOP);
+        GXSetAlphaCompare(GX_GEQUAL, 0, GX_AOP_OR, GX_GEQUAL, 0);
+        GXSetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+        GXSetZCompLoc(GX_TRUE);
+        GXSetCullMode(GX_CULL_NONE);
+        GXSetClipMode(GX_CLIP_ENABLE);
+    }
+    // Sparkle Material
+    else if(mMaterialChoice == 1){
+        GXSetNumTevStages(2);
+            
+        GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
+        GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXA, GX_CC_ZERO, GX_CC_ZERO, GX_CC_TEXC);
+        GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+        GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_TEXA, GX_CA_ZERO);
+        GXSetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+        GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
+        GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_C0, GX_CC_C0, GX_CC_CPREV, GX_CC_ZERO);
+        GXSetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_2, GX_FALSE, GX_TEVPREV);
+        GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+        GXSetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_2, GX_TRUE, GX_TEVPREV);
+        
+        GXSetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
+        GXSetAlphaCompare(GX_GEQUAL, 0, GX_AOP_OR, GX_GEQUAL, 0);
+        GXSetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+        GXSetZCompLoc(GX_TRUE);
+        GXSetCullMode(GX_CULL_NONE);
+        GXSetClipMode(GX_CLIP_ENABLE);
+    }
 
 }
+

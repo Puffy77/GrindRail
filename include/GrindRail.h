@@ -33,6 +33,8 @@ public:
     s32 mSWBBehavior;
     s32 mCollisionBehavior;
     s32 mDrawRails;
+    s32 mRailColor;
+    s32 mRailMaterial;
 
     f32 mPointSpeed;
     f32 mPointAccel;
@@ -52,7 +54,10 @@ public:
     bool mWallBonkDeath;
 
     GrindRailDrawer* mDrawer;
-    JUTTexture* mTexture;
+    JUTTexture* mTex0;
+    JUTTexture* mTex1;
+    TVec3f mTexUV0;
+    TVec3f mTexUV1;
 };
 
 class GrindRailDrawer {
@@ -66,6 +71,9 @@ public:
     f32* mRailCoords;
     u32 mDispListLength;
     u8* mDispList;
+
+    s32 mColorChoice;
+    s32 mMaterialChoice;
 
     s32 calcPointIndex(int i, int j) const {
         return j + i * mNumLoopPoints;
