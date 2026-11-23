@@ -25,14 +25,13 @@ public:
     TVec3f getJumpVec(f32 currentSpeed, s32 includeJump);
     void updatePlayerMtx();
     void getPointArgs();
-    
 
     f32 mSnapRadius;
     s32 mJumpAtEdge;
     s32 mReattachDelay;
     s32 mSWBBehavior;
     s32 mCollisionBehavior;
-    s32 mDrawRails;
+    s32 mRailSize;
     s32 mRailColor;
     s32 mRailMaterial;
 
@@ -72,6 +71,7 @@ public:
     u32 mDispListLength;
     u8* mDispList;
 
+    s32 mSizeChoice;
     s32 mColorChoice;
     s32 mMaterialChoice;
 

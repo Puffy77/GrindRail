@@ -38,7 +38,7 @@ Obj_Arg 1: Jump Behavior at Goal (Default: 1)
 Obj_Arg 2: Reattach Delay (Default: 30)
 Obj_Arg 3: SW_B Behavior (While Riding or On Reaching Goal) (Default: 1)
 Obj_Arg 4: Collision Behavior (Damage or Death) (Default: 0)
-Obj_Arg 5: Draw Rails (Default: 1)
+Obj_Arg 5: Draw Rails/Rail Size (Default: 20)
 Obj_Arg 6: Rail Color (Default: 0)
 Obj_Arg 7: Rail Material (Default: 0)
 
@@ -58,7 +58,7 @@ GrindRail::GrindRail(const char *pName) : LiveActor(pName) {
     mReattachDelay = 30;
     mSWBBehavior = 1;
     mCollisionBehavior = 0;
-    mDrawRails = 1;
+    mRailSize = 15;
     mRailColor = 0;
     mRailMaterial = 0;
 
@@ -97,6 +97,7 @@ GrindRailDrawer::GrindRailDrawer(GrindRail *pGrindRail){
     mDispListLength = 0;
     mDispList = 0;
 
+    mSizeChoice = pGrindRail->mRailSize;
     mColorChoice = pGrindRail->mRailColor;
     mMaterialChoice = pGrindRail->mRailMaterial;
 
@@ -117,7 +118,7 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::getJMapInfoArg2NoInit(rIter, &mReattachDelay);
     MR::getJMapInfoArg3NoInit(rIter, &mSWBBehavior);
     MR::getJMapInfoArg4NoInit(rIter, &mCollisionBehavior);
-    MR::getJMapInfoArg5NoInit(rIter, &mDrawRails);
+    MR::getJMapInfoArg5NoInit(rIter, &mRailSize);
     MR::getJMapInfoArg6NoInit(rIter, &mRailColor);
     MR::getJMapInfoArg7NoInit(rIter, &mRailMaterial);
 
@@ -136,8 +137,8 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     if(mCollisionBehavior < 0 || mCollisionBehavior > 1){
         mCollisionBehavior = 0;
     }
-    if(mDrawRails < 0 || mDrawRails > 1){
-        mDrawRails = 1;
+    if(mRailSize < 0){
+        mRailSize = 0;
     }
     if(mRailColor < 0 || mRailColor > 8){
         mRailColor = 0;
@@ -166,7 +167,7 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     MR::addHitSensorRide(this, "Damage", 4, 75.0f, TVec3f(0.0f, 0.0f, 0.0f));
     initBinder(75.0f, 0.0f, 0);
 
-    if(mDrawRails == 1){
+    if(mRailSize != 0){
 
         if(mRailMaterial == 0){
             mTex0 = new JUTTexture(MR::loadTexFromArc("GrindRail.arc", "MetalTop.bti", NULL), 0);
@@ -333,6 +334,7 @@ void GrindRail::exePlayerOnRail() {
         TVec3f oppVec = MR::getRailDirection(this);
         oppVec.scale(-1.0f);
         MR::endBindAndPlayerDamage(this, oppVec);
+        MR::setEffectHostSRT(this, "Collision", MR::getPlayerPos(), NULL, NULL);
         MR::emitEffect(this, "Collision");
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
         return;
@@ -340,6 +342,7 @@ void GrindRail::exePlayerOnRail() {
     }
 
     MR::stopPlayerFpView();
+    MR::setEffectHostSRT(this, "Spark", MR::getPlayerPos(), NULL, NULL);
     MR::emitEffect(this, "Spark");
 
     if (MR::isFirstStep(this) || mAnimWait == 26) {
@@ -571,7 +574,7 @@ void GrindRail::updatePlayerMtx(){
 
     TVec3f trans;
     baseMtx.getTrans(trans);
-    playerMtx.setTrans(trans);
+    playerMtx.setTrans(trans + (upVec * mRailSize));
     playerMtx.setZDir(railDir);
     playerMtx.setYDir(upVec);
     playerMtx.setXDir(sideVec);
@@ -579,8 +582,6 @@ void GrindRail::updatePlayerMtx(){
     MR::setBaseTRMtx(MarioAccess::getPlayerActor(), playerMtx);
 
 }
-
-
 
 void GrindRail::getPointArgs(){
 
@@ -714,7 +715,7 @@ void GrindRailDrawer::initPoints(GrindRail* pGrindRail){
 
         for (s32 loopIdx = 0; loopIdx < mNumLoopPoints; loopIdx++) {
             TVec3f pos = side;
-            pos.scale(15.0f);
+            pos.scale(mSizeChoice);
             pos.add(MR::getRailPos(pGrindRail));
             mPoints[pointIdx].set(pos);
             mNormals[pointIdx].set(side.x * sFloatToShortShift, side.y * sFloatToShortShift, side.z * sFloatToShortShift);
@@ -784,10 +785,10 @@ void GrindRailDrawer::sendGD() const{
         sTexRateV2 = 0.0001f;
     }
     else if(mMaterialChoice == 2){
-        sTexRateU0 = 0.133f;
-        sTexRateV0 = 0.0077f;
-        sTexRateU1 = 0.1f;
-        sTexRateV1 = 0.004f;
+        sTexRateU0 = 0.125f;
+        sTexRateV0 = 0.0055f;
+        sTexRateU1 = 0.125f;
+        sTexRateV1 = 0.002f;
         sTexRateU2 = 0.1f;
         sTexRateV2 = 0.0001f;
     }
@@ -1031,19 +1032,19 @@ GXColor GrindRailDrawer::getTevColor(int tevNum) const{
     else if (mMaterialChoice == 2){
         if(mColorChoice == 0){
             sTevColor0 = (GXColor){0xFF, 0xFF, 0xFF, 0xFF};
-            sTevColor1 = (GXColor){0x82, 0x82, 0x82, 0x60};
+            sTevColor1 = (GXColor){0x82, 0x82, 0x82, 0x90};
         }
         else if(mColorChoice == 1){
             sTevColor0 = (GXColor){0xFF, 0xDC, 0x00, 0xFF};
-            sTevColor1 = (GXColor){0xB4, 0x00, 0x00, 0x60};
+            sTevColor1 = (GXColor){0xB4, 0x00, 0x00, 0x90};
         }
         else if(mColorChoice == 2){
             sTevColor0 = (GXColor){0xFF, 0xFF, 0x00, 0xFF};
-            sTevColor1 = (GXColor){0x00, 0x94, 0x1D, 0x60};
+            sTevColor1 = (GXColor){0x00, 0x94, 0x1D, 0x90};
         }
         else if(mColorChoice == 3){
             sTevColor0 = (GXColor){0xA0, 0xFF, 0xFF, 0xFF};
-            sTevColor1 = (GXColor){0x00, 0x3A, 0xE6, 0x60};
+            sTevColor1 = (GXColor){0x00, 0x3A, 0xE6, 0x90};
         }
     }
 
