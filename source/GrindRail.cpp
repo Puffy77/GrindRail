@@ -142,8 +142,8 @@ void GrindRail::init(const JMapInfoIter &rIter) {
     if(mRailColor < 0 || mRailColor > 8){
         mRailColor = 0;
     }
-    if(mRailMaterial < 0 || mRailMaterial > 1){
-        mRailMaterial = 1;
+    if(mRailMaterial < 0 || mRailMaterial > 3){
+        mRailMaterial = 0;
     }
 
     mSnapRadius /= 1000.0f;
@@ -175,6 +175,10 @@ void GrindRail::init(const JMapInfoIter &rIter) {
         else if(mRailMaterial == 1){
             mTex0 = new JUTTexture(MR::loadTexFromArc("GrindRail.arc", "Sparkles.bti", NULL), 0);
             mTex1 = new JUTTexture(MR::loadTexFromArc("GrindRail.arc", "Sparkles.bti", NULL), 0);
+        }
+        else if (mRailMaterial == 2){
+            mTex0 = new JUTTexture(MR::loadTexFromArc("GrindRail.arc", "Water0.bti", NULL), 0);
+            mTex1 = new JUTTexture(MR::loadTexFromArc("GrindRail.arc", "Water1.bti", NULL), 0);
         }
         
         mDrawer = new GrindRailDrawer(this);
@@ -225,6 +229,12 @@ void GrindRail::control() {
         mTexUV0.y = MR::repeat(mTexUV0.y - 0.003, 0.0f, 1.0f);
         mTexUV1.x = MR::repeat(mTexUV1.x + 0.0003, 0.0f, 1.0f);
         mTexUV1.y = MR::repeat(mTexUV1.y + 0.0005, 0.0f, 1.0f);
+    }
+    else if(mRailMaterial == 2){
+        mTexUV0.x = MR::repeat(mTexUV0.x + 0.001, 0.0f, 1.0f);
+        mTexUV0.y = MR::repeat(mTexUV0.y - 0.0065, 0.0f, 1.0f);
+        mTexUV1.x = MR::repeat(mTexUV1.x - 0.0015, 0.0f, 1.0f);
+        mTexUV1.y = MR::repeat(mTexUV1.y - 0.003, 0.0f, 1.0f);
     }
 }
 
@@ -396,7 +406,7 @@ void GrindRail::exePlayerOnRail() {
         
     }
 
-    if(MR::isCurrentRushSpinDriver()){
+    if(MR::isCurrentRushSpinDriver() || MR::isPowerStarGetDemoActive()){
         MR::endBindAndPlayerWait(this);
         setNerve(&NrvGrindRail::NrvJumpingOff::sInstance);
     }
@@ -753,6 +763,10 @@ void GrindRailDrawer::sendGD() const{
     f32 sTexRateU2;
     f32 sTexRateV2;
 
+    // increase = smaller
+    // decrease = bigger
+    // U = around rail
+    // V = along rail
     if(mMaterialChoice == 0){
         sTexRateU0 = 0.15f;
         sTexRateV0 = 0.0001f;
@@ -766,6 +780,14 @@ void GrindRailDrawer::sendGD() const{
         sTexRateV0 = 0.005f;
         sTexRateU1 = 0.15f;
         sTexRateV1 = 0.0001f;
+        sTexRateU2 = 0.1f;
+        sTexRateV2 = 0.0001f;
+    }
+    else if(mMaterialChoice == 2){
+        sTexRateU0 = 0.133f;
+        sTexRateV0 = 0.0077f;
+        sTexRateU1 = 0.1f;
+        sTexRateV1 = 0.004f;
         sTexRateU2 = 0.1f;
         sTexRateV2 = 0.0001f;
     }
@@ -867,21 +889,15 @@ void GrindRailDrawer::loadMaterialHigh() const{
 
     GXSetNumIndStages(0);
 
-    GXColor sTevColor0 = {0xFF, 0xFF, 0xFF, 0xFF};
-    GXColor sTevColor1 = {0x00, 0x00, 0x00, 0xFF};
+    GXColor sTevColor0 = getTevColor(0);
+    GXColor sTevColor1 = getTevColor(1);
 
-    if(mColorChoice == 2){
-        sTevColor0 = (GXColor){0xFF, 0x00, 0xAE, 0xFF};
-        sTevColor1 = (GXColor){0x74, 0x00, 0x16, 0xFF};
-    }
-    else if(mColorChoice == 3){
-        sTevColor0 = (GXColor){0x67, 0xFF, 0x82, 0xFF};
-        sTevColor1 = (GXColor){0x00, 0x62, 0x14, 0xFF};
-    }
-    else if(mColorChoice == 4){
-        sTevColor0 = (GXColor){0x67, 0xDA, 0xFF, 0xFF};
-        sTevColor1 = (GXColor){0x1A, 0x14, 0x92, 0xFF};
-    }
+    /*  0 = Gray
+        1 = Red
+        2 = Green
+        3 = Blue
+    */
+    
 
     GXSetTevColor(GX_TEVREG0, sTevColor0);
     GXSetTevColor(GX_TEVREG1, sTevColor1);
@@ -892,21 +908,21 @@ void GrindRailDrawer::loadMaterialHigh() const{
             
         GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
         GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_C1, GX_CC_C0, GX_CC_TEXC, GX_CC_ZERO);
-        GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+        GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
         GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
-        GXSetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+        GXSetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 
         GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR_NULL);
         GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_C1, GX_CC_TEXC, GX_CC_ZERO);
-        GXSetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_2, GX_FALSE, GX_TEVREG2);
+        GXSetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_2, GX_TRUE, GX_TEVREG2);
         GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
-        GXSetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+        GXSetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 
         GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR_NULL);
         GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_C2, GX_CC_CPREV, GX_CC_APREV, GX_CC_ZERO);
-        GXSetTevColorOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+        GXSetTevColorOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
         GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
-        GXSetTevAlphaOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+        GXSetTevAlphaOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 
         GXSetBlendMode(GX_BM_NONE, GX_BL_ONE, GX_BL_ZERO, GX_LO_NOOP);
         GXSetAlphaCompare(GX_GEQUAL, 0, GX_AOP_OR, GX_GEQUAL, 0);
@@ -921,15 +937,44 @@ void GrindRailDrawer::loadMaterialHigh() const{
             
         GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
         GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXA, GX_CC_ZERO, GX_CC_ZERO, GX_CC_TEXC);
-        GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
+        GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
         GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_TEXA, GX_CA_ZERO);
         GXSetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 
         GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
         GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_C0, GX_CC_C0, GX_CC_CPREV, GX_CC_ZERO);
-        GXSetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_2, GX_FALSE, GX_TEVPREV);
+        GXSetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_2, GX_TRUE, GX_TEVPREV);
         GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
         GXSetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_2, GX_TRUE, GX_TEVPREV);
+        
+        GXSetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
+        GXSetAlphaCompare(GX_GEQUAL, 0, GX_AOP_OR, GX_GEQUAL, 0);
+        GXSetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+        GXSetZCompLoc(GX_TRUE);
+        GXSetCullMode(GX_CULL_NONE);
+        GXSetClipMode(GX_CLIP_ENABLE);
+    }
+    // Water Material
+    else if(mMaterialChoice == 2){
+        GXSetNumTevStages(3);
+            
+        GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
+        GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_TEXC);
+        GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+        GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+        GXSetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_4, GX_TRUE, GX_TEVPREV);
+
+        GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR_NULL);
+        GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_TEXC, GX_CC_CPREV, GX_CC_ZERO);
+        GXSetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+        GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_TEXA, GX_CA_APREV, GX_CA_ZERO);
+        GXSetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_4, GX_TRUE, GX_TEVPREV);
+
+        GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR_NULL);
+        GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_C1, GX_CC_C0, GX_CC_APREV, GX_CC_ZERO);
+        GXSetTevColorOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+        GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_A1, GX_CA_A0, GX_CA_APREV, GX_CA_ZERO);
+        GXSetTevAlphaOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
         
         GXSetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GXSetAlphaCompare(GX_GEQUAL, 0, GX_AOP_OR, GX_GEQUAL, 0);
@@ -941,3 +986,71 @@ void GrindRailDrawer::loadMaterialHigh() const{
 
 }
 
+GXColor GrindRailDrawer::getTevColor(int tevNum) const{
+
+    GXColor sTevColor0 = {0xFF, 0xFF, 0xFF, 0xFF};
+    GXColor sTevColor1 = {0x00, 0x00, 0x00, 0xFF};
+
+    // Metal Pipe
+    if(mMaterialChoice == 0){
+        if(mColorChoice == 0){
+            sTevColor0 = (GXColor){0xFF, 0xFF, 0xFF, 0xFF};
+            sTevColor1 = (GXColor){0x00, 0x00, 0x00, 0xFF};
+        }
+        else if(mColorChoice == 1){
+            sTevColor0 = (GXColor){0xFF, 0x00, 0xAE, 0xFF};
+            sTevColor1 = (GXColor){0x74, 0x00, 0x16, 0xFF};
+        }
+        else if(mColorChoice == 2){
+            sTevColor0 = (GXColor){0x67, 0xFF, 0x82, 0xFF};
+            sTevColor1 = (GXColor){0x00, 0x62, 0x14, 0xFF};
+        }
+        else if(mColorChoice == 3){
+            sTevColor0 = (GXColor){0x67, 0xDA, 0xFF, 0xFF};
+            sTevColor1 = (GXColor){0x1A, 0x14, 0x92, 0xFF};
+        }
+    }
+    else if (mMaterialChoice == 1){
+        if(mColorChoice == 0){
+            sTevColor0 = (GXColor){0xFF, 0xFF, 0xFF, 0xFF};
+            sTevColor1 = (GXColor){0x00, 0x00, 0x00, 0xFF};
+        }
+        else if(mColorChoice == 1){
+            sTevColor0 = (GXColor){0xFF, 0x00, 0xAE, 0xFF};
+            sTevColor1 = (GXColor){0x74, 0x00, 0x16, 0xFF};
+        }
+        else if(mColorChoice == 2){
+            sTevColor0 = (GXColor){0x67, 0xFF, 0x82, 0xFF};
+            sTevColor1 = (GXColor){0x00, 0x62, 0x14, 0xFF};
+        }
+        else if(mColorChoice == 3){
+            sTevColor0 = (GXColor){0x67, 0xDA, 0xFF, 0xFF};
+            sTevColor1 = (GXColor){0x1A, 0x14, 0x92, 0xFF};
+        }
+    }
+    else if (mMaterialChoice == 2){
+        if(mColorChoice == 0){
+            sTevColor0 = (GXColor){0xFF, 0xFF, 0xFF, 0xFF};
+            sTevColor1 = (GXColor){0x82, 0x82, 0x82, 0x60};
+        }
+        else if(mColorChoice == 1){
+            sTevColor0 = (GXColor){0xFF, 0xDC, 0x00, 0xFF};
+            sTevColor1 = (GXColor){0xB4, 0x00, 0x00, 0x60};
+        }
+        else if(mColorChoice == 2){
+            sTevColor0 = (GXColor){0xFF, 0xFF, 0x00, 0xFF};
+            sTevColor1 = (GXColor){0x00, 0x94, 0x1D, 0x60};
+        }
+        else if(mColorChoice == 3){
+            sTevColor0 = (GXColor){0xA0, 0xFF, 0xFF, 0xFF};
+            sTevColor1 = (GXColor){0x00, 0x3A, 0xE6, 0x60};
+        }
+    }
+
+    if(tevNum == 1){
+        return sTevColor1;
+    }
+    else{
+        return sTevColor0;
+    }
+}

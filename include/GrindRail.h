@@ -86,4 +86,5 @@ public:
     void sendGD() const;
     void drawGD() const;
     void loadMaterialHigh() const;
+    GXColor getTevColor(int tevNum) const;
 };
